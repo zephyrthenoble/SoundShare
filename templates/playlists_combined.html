@@ -22,24 +22,11 @@
     </div>
 </div>
 
-<!-- Playlist Management Tabs -->
-<ul class="nav nav-tabs" id="playlistTabs" role="tablist">
-    <li class="nav-item" role="presentation">
-        <button class="nav-link active" id="static-playlists-tab" data-bs-toggle="tab" data-bs-target="#static-playlists" type="button" role="tab">
-            Static Playlists
-        </button>
-    </li>
-    <li class="nav-item" role="presentation">
-        <button class="nav-link" id="dynamic-playlists-tab" data-bs-toggle="tab" data-bs-target="#dynamic-playlists" type="button" role="tab">
-            Dynamic Playlists
-        </button>
-    </li>
-</ul>
-
-<div class="tab-content" id="playlistTabContent">
-    <!-- Static Playlists Tab -->
-    <div class="tab-pane fade show active" id="static-playlists" role="tabpanel">
-        <div class="card mt-3">
+<!-- Playlist Management Columns -->
+<div class="row">
+    <!-- Static Playlists Column -->
+    <div class="col-lg-6">
+        <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">Static Playlists</h5>
                 <small class="text-muted">Custom playlists with manually selected songs</small>
@@ -52,9 +39,9 @@
         </div>
     </div>
 
-    <!-- Dynamic Playlists Tab -->
-    <div class="tab-pane fade" id="dynamic-playlists" role="tabpanel">
-        <div class="card mt-3">
+    <!-- Dynamic Playlists Column -->
+    <div class="col-lg-6">
+        <div class="card">
             <div class="card-header">
                 <h5 class="mb-0">Dynamic Playlists</h5>
                 <small class="text-muted">Smart playlists that automatically update based on tag criteria. Use Rescan to refresh after tag changes.</small>
