@@ -14,9 +14,9 @@
                 <button type="button" class="btn btn-outline-info" onclick="rescanPlaylist()" id="rescanBtn">
                     <i class="fas fa-sync"></i> Rescan
                 </button>
-                <a href="/playlists" class="btn btn-outline-secondary">
-                    <i class="fas fa-arrow-left"></i> Back to Playlists
-                </a>
+                <button type="button" class="btn btn-outline-secondary" onclick="goBackToPlaylist()" id="backBtn">
+                    <i class="fas fa-arrow-left"></i> Back to Playlist
+                </button>
             </div>
         </div>
     </div>
@@ -231,6 +231,24 @@
 </div>
 
 {% include 'components/song_info_modal.html' %}
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title" id="successModalLabel">
+                    <i class="fas fa-check-circle me-2"></i>Success
+                </h5>
+            </div>
+            <div class="modal-body text-center">
+                <i class="fas fa-check-circle text-success" style="font-size: 3rem;"></i>
+                <h6 class="mt-3">Playlist updated successfully!</h6>
+                <p class="text-muted mb-0">Your changes have been saved.</p>
+            </div>
+        </div>
+    </div>
+</div>
 
 <!-- Add SortableJS for potential drag and drop functionality -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
@@ -958,12 +976,35 @@ async function savePlaylist() {
             return true;
         }).length;
         
-        alert(`Dynamic playlist "${name}" updated successfully!\nCurrently matches ${matchingCount} songs.`);
-        window.location.href = '/playlists';
+        // Show success modal instead of alert and redirect
+        const successModal = new bootstrap.Modal(document.getElementById('successModal'));
+        successModal.show();
+        
+        // Auto-hide the modal after 2 seconds
+        setTimeout(() => {
+            successModal.hide();
+        }, 2000);
+        
+        // Reset save button to original state
+        const saveBtn = document.getElementById('saveBtn');
+        saveBtn.innerHTML = '<i class="fas fa-save"></i> Save';
+        saveBtn.classList.remove('btn-warning');
+        saveBtn.classList.add('btn-success');
+        
+        // Update the preview to show new results
+        updatePreview();
         
     } catch (error) {
         console.error('Error updating dynamic playlist:', error);
         alert('Error updating dynamic playlist. Please try again.');
+    }
+}
+
+function goBackToPlaylist() {
+    if (playlistId) {
+        window.location.href = `/playlists/dynamic/${playlistId}`;
+    } else {
+        window.location.href = '/playlists';
     }
 }
 

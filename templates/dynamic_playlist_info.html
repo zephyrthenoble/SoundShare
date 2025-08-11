@@ -29,10 +29,12 @@
 <div class="row mb-4">
     <div class="col-12">
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#playlistCriteriaCollapse" aria-expanded="true" style="cursor: pointer;">
                 <h5 class="mb-0">Playlist Criteria</h5>
+                <i class="fas fa-chevron-down" id="criteriaChevron"></i>
             </div>
-            <div class="card-body">
+            <div class="collapse show" id="playlistCriteriaCollapse">
+                <div class="card-body">
                 <!-- Audio Features Row -->
                 <div class="row mb-4">
                     <div class="col-12">
@@ -68,6 +70,7 @@
                         </div>
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     </div>
@@ -189,15 +192,15 @@
 <!-- Song Lists -->
 <div class="row">
     <!-- Current Songs -->
-    <div class="col-lg-6">
+    <div class="col-lg-8" id="playlistSongsCol">
         <div class="card">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Matching Songs</h5>
+                <h5 class="mb-0">Playlist Songs</h5>
                 <button class="btn btn-sm btn-outline-secondary" onclick="loadPlaylistSongs()">
                     <i class="fas fa-refresh"></i> Refresh
                 </button>
             </div>
-            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
+            <div class="card-body" style="max-height: 500px; overflow-y: auto;" id="playlistSongsBody">
                 <div id="playlistSongs">
                     <div class="text-center py-4">
                         <div class="spinner-border" role="status">
@@ -211,17 +214,69 @@
     </div>
 
     <!-- Session History -->
-    <div class="col-lg-6">
+    <div class="col-lg-4" id="sessionHistoryCol">
         <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Session History</h5>
-                <small class="text-muted">Recently played songs</small>
+            <div class="card-header d-flex justify-content-between align-items-center" data-bs-toggle="collapse" data-bs-target="#sessionHistoryCollapse" aria-expanded="true" style="cursor: pointer;">
+                <div>
+                    <h5 class="mb-0">Session History</h5>
+                    <small class="text-muted">Recently played songs</small>
+                </div>
+                <i class="fas fa-chevron-left" id="historyChevron"></i>
             </div>
-            <div class="card-body" style="max-height: 500px; overflow-y: auto;">
-                <div id="sessionHistory">
-                    <div class="text-center py-4 text-muted">
-                        <i class="fas fa-history fa-2x mb-2"></i>
-                        <p>No songs played yet</p>
+            <div class="collapse collapse-horizontal show" id="sessionHistoryCollapse">
+                <div class="card-body" style="max-height: 500px; overflow-y: auto; min-width: 300px;">
+                    <div id="sessionHistory">
+                        <div class="text-center py-4 text-muted">
+                            <i class="fas fa-history fa-2x mb-2"></i>
+                            <p>No songs played yet</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Song Info Modal -->
+<div class="modal fade" id="songInfoModal" tabindex="-1" aria-labelledby="songInfoModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="songInfoModalLabel">Song Information</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h6>Basic Information</h6>
+                        <table class="table table-sm">
+                            <tr><td><strong>Title:</strong></td><td id="modalSongTitle">-</td></tr>
+                            <tr><td><strong>Artist:</strong></td><td id="modalSongArtist">-</td></tr>
+                            <tr><td><strong>Album:</strong></td><td id="modalSongAlbum">-</td></tr>
+                            <tr><td><strong>Track:</strong></td><td id="modalSongTrack">-</td></tr>
+                            <tr><td><strong>Duration:</strong></td><td id="modalSongDuration">-</td></tr>
+                            <tr><td><strong>Genre:</strong></td><td id="modalSongGenre">-</td></tr>
+                            <tr><td><strong>Year:</strong></td><td id="modalSongYear">-</td></tr>
+                        </table>
+                    </div>
+                    <div class="col-md-6">
+                        <h6>Audio Features</h6>
+                        <table class="table table-sm">
+                            <tr><td><strong>Energy:</strong></td><td id="modalSongEnergy">-</td></tr>
+                            <tr><td><strong>Valence:</strong></td><td id="modalSongValence">-</td></tr>
+                            <tr><td><strong>Danceability:</strong></td><td id="modalSongDanceability">-</td></tr>
+                        </table>
+                        <h6>Tags</h6>
+                        <div id="modalSongTags" class="mb-3">-</div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-12">
+                        <h6>File Information</h6>
+                        <table class="table table-sm">
+                            <tr><td><strong>File Path:</strong></td><td id="modalSongPath" class="text-break">-</td></tr>
+                            <tr><td><strong>File Size:</strong></td><td id="modalSongSize">-</td></tr>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -230,29 +285,18 @@
 </div>
 
 <script>
-// Global variables
+// Global variables (used by shared library)
 let playlistId = null;
 let playlist = null;
 let songs = [];
-let currentSongIndex = -1;
-let isPlaying = false;
-let isShuffleMode = false;
-let isAutoplay = true;
-let sessionHistory = [];
-let playlistTracking = [];
-
-// Audio player
-let audioPlayer = null;
-let progressInterval = null;
 
 document.addEventListener('DOMContentLoaded', function() {
     // Get playlist ID from URL
     const path = window.location.pathname;
     playlistId = parseInt(path.split('/').pop());
     
-    // Initialize audio player
-    audioPlayer = document.getElementById('audioPlayer');
-    setupAudioEventListeners();
+    // Initialize shared player
+    window.playlistPlayer.init(playlistId);
     
     // Load playlist data
     loadPlaylistData();
@@ -267,8 +311,11 @@ async function loadPlaylistData() {
         
         playlist = await response.json();
         
+        // Update shared player data
+        window.playlistPlayer.playlist = playlist;
+        
         // Update UI
-        updatePlaylistInfo();
+        window.playlistPlayer.updatePlaylistInfo();
         displayPlaylistCriteria();
         loadPlaylistSongs();
         
@@ -290,8 +337,12 @@ async function loadPlaylistSongs() {
         }
         
         songs = await response.json();
+        
+        // Update shared player data
+        window.playlistPlayer.songs = songs;
+        
         renderPlaylistSongs();
-        updateStatistics();
+        window.playlistPlayer.updateStatistics();
         
     } catch (error) {
         console.error('Error loading songs:', error);
@@ -302,11 +353,6 @@ async function loadPlaylistSongs() {
             </div>
         `;
     }
-}
-
-function updatePlaylistInfo() {
-    document.getElementById('playlistTitle').textContent = playlist.name;
-    document.getElementById('playlistDescription').textContent = playlist.description || 'No description';
 }
 
 function displayPlaylistCriteria() {
@@ -411,25 +457,67 @@ function renderPlaylistSongs() {
         `;
         return;
     }
-    
-    container.innerHTML = songs.map((song, index) => `
-        <div class="song-item d-flex align-items-center p-2 mb-2 border rounded" data-song-id="${song.id}" data-index="${index}">
-            <div class="flex-grow-1">
-                <div class="fw-bold">${song.display_name}</div>
-                <small class="text-muted">${song.artist || 'Unknown Artist'}</small>
-                ${song.tags && song.tags.length > 0 ? `
-                    <div class="mt-1">
-                        ${song.tags.map(tag => `<span class="badge bg-secondary me-1" style="font-size: 0.7em;">${tag.name}</span>`).join('')}
-                    </div>
-                ` : ''}
-            </div>
-            <div class="ms-2">
-                <button class="btn btn-sm btn-outline-primary" onclick="playSong(${index})" title="Play Song">
-                    <i class="fas fa-play"></i>
-                </button>
-            </div>
+
+    // Create table structure for better layout
+    container.innerHTML = `
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead>
+                    <tr>
+                        <th width="30"></th>
+                        <th width="250">Name</th>
+                        <th width="150">Artist</th>
+                        <th width="150">Album</th>
+                        <th width="80">Duration</th>
+                        <th width="120">Tags</th>
+                        <th width="50">Info</th>
+                    </tr>
+                </thead>
+                <tbody id="songTableBody">
+                </tbody>
+            </table>
         </div>
-    `).join('');
+    `;
+
+    const tbody = document.getElementById('songTableBody');
+    tbody.innerHTML = songs.map((song, index) => {
+        const formatDuration = (seconds) => {
+            if (!seconds) return '';
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        };
+
+        return `
+            <tr class="song-row" data-song-id="${song.id}" data-index="${index}" draggable="true">
+                <td>
+                    <button class="btn btn-sm btn-outline-primary" onclick="playSong(${index})" title="Play Song">
+                        <i class="fas fa-play"></i>
+                    </button>
+                </td>
+                <td class="fw-bold" title="${song.display_name}">${song.display_name}</td>
+                <td class="text-muted" title="${song.artist || ''}">${song.artist || 'Unknown Artist'}</td>
+                <td class="text-muted" title="${song.album || ''}">${song.album || ''}</td>
+                <td class="text-muted">${formatDuration(song.duration)}</td>
+                <td>
+                    ${song.tags && song.tags.length > 0 ? 
+                        song.tags.slice(0, 2).map(tag => 
+                            `<span class="badge bg-secondary me-1" style="font-size: 0.7em;">${tag.name}</span>`
+                        ).join('') + (song.tags.length > 2 ? `<span class="text-muted">+${song.tags.length - 2}</span>` : '')
+                        : '<span class="text-muted">-</span>'
+                    }
+                </td>
+                <td>
+                    <button class="btn btn-sm btn-outline-info" onclick="showPlaylistSongInfo(${song.id})" title="Song Info">
+                        <i class="fas fa-info"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+    }).join('');
+
+    // Initialize drag and drop for reordering
+    initializeDragAndDrop();
 }
 
 async function rescanPlaylist() {
@@ -720,6 +808,162 @@ function highlightCurrentSong() {
         }
     }
 }
+
+// Initialize drag and drop for song reordering
+function initializeDragAndDrop() {
+    const tbody = document.getElementById('songTableBody');
+    if (!tbody) return;
+
+    let draggedElement = null;
+    let draggedIndex = null;
+
+    tbody.querySelectorAll('.song-row').forEach(row => {
+        row.addEventListener('dragstart', (e) => {
+            draggedElement = e.target.closest('.song-row');
+            draggedIndex = parseInt(draggedElement.dataset.index);
+            e.dataTransfer.effectAllowed = 'move';
+            draggedElement.style.opacity = '0.5';
+        });
+
+        row.addEventListener('dragend', (e) => {
+            e.target.style.opacity = '';
+            draggedElement = null;
+            draggedIndex = null;
+        });
+
+        row.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        });
+
+        row.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (!draggedElement) return;
+
+            const targetRow = e.target.closest('.song-row');
+            if (!targetRow || targetRow === draggedElement) return;
+
+            const targetIndex = parseInt(targetRow.dataset.index);
+            
+            // Reorder songs array
+            const draggedSong = songs.splice(draggedIndex, 1)[0];
+            songs.splice(targetIndex, 0, draggedSong);
+            
+            // Re-render the table
+            renderPlaylistSongs();
+        });
+    });
+}
+
+// Show song info modal
+async function showPlaylistSongInfo(songId) {
+    try {
+        const response = await fetch(`/api/songs/${songId}`);
+        if (!response.ok) {
+            throw new Error('Failed to load song details');
+        }
+        
+        const song = await response.json();
+        
+        // Populate modal with song information
+        document.getElementById('modalSongTitle').textContent = song.display_name || '-';
+        document.getElementById('modalSongArtist').textContent = song.artist || '-';
+        document.getElementById('modalSongAlbum').textContent = song.album || '-';
+        document.getElementById('modalSongTrack').textContent = song.track_number ? `Track ${song.track_number}` : '-';
+        document.getElementById('modalSongDuration').textContent = song.duration ? formatTime(song.duration) : '-';
+        document.getElementById('modalSongGenre').textContent = song.genre || '-';
+        document.getElementById('modalSongYear').textContent = song.year || '-';
+        
+        // Audio features
+        document.getElementById('modalSongEnergy').textContent = song.energy ? `${(song.energy * 100).toFixed(1)}%` : '-';
+        document.getElementById('modalSongValence').textContent = song.valence ? `${(song.valence * 100).toFixed(1)}%` : '-';
+        document.getElementById('modalSongDanceability').textContent = song.danceability ? `${(song.danceability * 100).toFixed(1)}%` : '-';
+        
+        // Tags
+        const tagsContainer = document.getElementById('modalSongTags');
+        if (song.tags && song.tags.length > 0) {
+            tagsContainer.innerHTML = song.tags.map(tag => 
+                `<span class="badge bg-secondary me-1">${tag.name}</span>`
+            ).join('');
+        } else {
+            tagsContainer.innerHTML = '<span class="text-muted">No tags</span>';
+        }
+        
+        // File info
+        document.getElementById('modalSongPath').textContent = song.file_path || '-';
+        document.getElementById('modalSongSize').textContent = song.file_size ? formatFileSize(song.file_size) : '-';
+        
+        // Show modal
+        const modal = new bootstrap.Modal(document.getElementById('songInfoModal'));
+        modal.show();
+        
+    } catch (error) {
+        console.error('Error loading song details:', error);
+        alert('Error loading song details');
+    }
+}
+
+// Format file size
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+}
+
+// Format time
+function formatTime(seconds) {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Handle collapse chevron rotation
+document.addEventListener('DOMContentLoaded', function() {
+    // Criteria collapse handler
+    const criteriaCollapse = document.getElementById('playlistCriteriaCollapse');
+    const criteriaChevron = document.getElementById('criteriaChevron');
+    
+    if (criteriaCollapse && criteriaChevron) {
+        criteriaCollapse.addEventListener('show.bs.collapse', () => {
+            criteriaChevron.classList.remove('fa-chevron-right');
+            criteriaChevron.classList.add('fa-chevron-down');
+        });
+        
+        criteriaCollapse.addEventListener('hide.bs.collapse', () => {
+            criteriaChevron.classList.remove('fa-chevron-down');
+            criteriaChevron.classList.add('fa-chevron-right');
+        });
+    }
+    
+    // History collapse handler
+    const historyCollapse = document.getElementById('sessionHistoryCollapse');
+    const historyChevron = document.getElementById('historyChevron');
+    
+    if (historyCollapse && historyChevron) {
+        historyCollapse.addEventListener('show.bs.collapse', () => {
+            historyChevron.classList.remove('fa-chevron-right');
+            historyChevron.classList.add('fa-chevron-left');
+        });
+        
+        historyCollapse.addEventListener('hide.bs.collapse', () => {
+            historyChevron.classList.remove('fa-chevron-left');
+            historyChevron.classList.add('fa-chevron-right');
+        });
+    }
+    
+    // Session history collapse handler for expanding playlist songs
+    if (historyCollapse) {
+        historyCollapse.addEventListener('hidden.bs.collapse', () => {
+            document.getElementById('playlistSongsCol').className = 'col-lg-12';
+        });
+        
+        historyCollapse.addEventListener('shown.bs.collapse', () => {
+            document.getElementById('playlistSongsCol').className = 'col-lg-8';
+        });
+    }
+});
 </script>
 
 <style>
