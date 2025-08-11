@@ -1,0 +1,126 @@
+/* Custom styles for SoundShare */
+
+body {
+    background-color: #f8f9fa;
+}
+
+.navbar-brand {
+    font-weight: bold;
+    font-size: 1.5rem;
+}
+
+.card {
+    box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+    border: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.card-header {
+    background-color: rgba(0, 0, 0, 0.03);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.125);
+}
+
+.badge {
+    font-size: 0.875em;
+}
+
+.btn-group-sm > .btn, .btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* Preview player styles */
+.preview-player {
+    max-width: 100%;
+    margin-top: 1rem;
+}
+
+/* Tag group colors */
+.tag-group-color-indicator {
+    width: 4px;
+    height: 100%;
+    position: absolute;
+    left: 0;
+    top: 0;
+}
+
+/* Loading states */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .btn-group .btn {
+        margin-bottom: 0.25rem;
+    }
+    
+    .d-flex.gap-2 {
+        flex-direction: column;
+    }
+    
+    .d-flex.gap-2 > * {
+        margin-bottom: 0.5rem;
+    }
+}
+
+/* Audio visualization (for future enhancement) */
+.audio-visualizer {
+    height: 60px;
+    background: linear-gradient(to right, #007bff, #28a745);
+    border-radius: 4px;
+    margin: 1rem 0;
+}
+
+/* Mood indicators */
+.mood-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 4px;
+}
+
+.mood-high { background-color: #28a745; }
+.mood-medium { background-color: #ffc107; }
+.mood-low { background-color: #dc3545; }
+
+/* Tag selector improvements */
+.tag-selector {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+}
+
+/* Upload progress */
+.upload-progress {
+    height: 4px;
+    background-color: #e9ecef;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 1rem;
+}
+
+.upload-progress-bar {
+    height: 100%;
+    background-color: #007bff;
+    transition: width 0.3s ease;
+}
+
+/* Dark mode support (for future) */
+@media (prefers-color-scheme: dark) {
+
+}
+
+/* In your custom CSS or Sass file */
+[data-bs-theme="dark"] {
+  --bs-body-color: #f8f9fa; /* A light off-white color */
+  --bs-body-bg: #343a40; /* Dark background color */
+  --bs-border-color: #454d55; /* Dark border color */
+  --bs-table-striped-bg: #495057; /* Dark striped table background */
+  --bs-table-striped-color: #f8f9fa; /* Light text color for striped table */
+  --bs-table-active-color: #f8f9fa; /* Light text color for active table rows */
+  --bs-table-hover-color: #f8f9fa; /* Light text color for hover table rows */
+}

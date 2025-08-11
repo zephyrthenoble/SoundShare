@@ -1,0 +1,19 @@
+<!-- Filter Controls Component -->
+<!-- Usage: Set variables before including: search_id, sort_id, tag_filter_id, filter_function -->
+<div class="row mb-3">
+    <div class="col-md-6">
+        <input type="text" class="form-control form-control-sm" id="{{ search_id }}" placeholder="Search songs..." onkeyup="{{ filter_function }}">
+    </div>
+    <div class="col-md-3">
+        <select class="form-select form-select-sm" id="{{ sort_id }}" onchange="{{ filter_function }}">
+            <option value="name">Sort by Name</option>
+            <option value="artist">Sort by Artist</option>
+            <option value="album">Sort by Album</option>
+        </select>
+    </div>
+    <div class="col-md-3">
+        <select class="form-select form-select-sm" id="{{ tag_filter_id }}" onchange="{{ filter_function }}">
+            <option value="">All Tags</option>
+        </select>
+    </div>
+</div>

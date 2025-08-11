@@ -1,0 +1,959 @@
+{% extends "base.html" %}
+
+{% block title %}Playing - SoundShare{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1>Music Player</h1>
+        <p class="text-muted">Select a playlist or create a dynamic playlist for your D&D session</p>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Playlist Selection Panel -->
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Select Playlist</h5>
+            </div>
+            <div class="card-body">
+                <!-- Playlist Type Selector -->
+                <div class="mb-3">
+                    <label class="form-label">Playlist Type</label>
+                    <select class="form-select" id="playlistType" onchange="onPlaylistTypeChange()">
+                        <option value="">Choose playlist type...</option>
+                        <option value="static">Static Playlist</option>
+                        <option value="dynamic">Saved Dynamic Playlist</option>
+                        <option value="custom">Create Dynamic Playlist</option>
+                    </select>
+                </div>
+
+                <!-- Static Playlists -->
+                <div id="staticPlaylistsSection" style="display: none;">
+                    <label class="form-label">Static Playlists</label>
+                    <select class="form-select" id="staticPlaylistSelect" onchange="loadStaticPlaylist()">
+                        <option value="">Select playlist...</option>
+                    </select>
+                </div>
+
+                <!-- Dynamic Playlists -->
+                <div id="dynamicPlaylistsSection" style="display: none;">
+                    <label class="form-label">Dynamic Playlists</label>
+                    <select class="form-select" id="dynamicPlaylistSelect" onchange="loadDynamicPlaylist()">
+                        <option value="">Select dynamic playlist...</option>
+                    </select>
+                </div>
+
+                <!-- Custom Dynamic Playlist Creator -->
+                <div id="customDynamicSection" style="display: none;">
+                    <div class="mb-3">
+                        <label class="form-label">Include Tags (songs must have at least one)</label>
+                        <div id="includeTagsContainer" class="border rounded p-2 mb-2" style="min-height: 60px;">
+                            <div id="selectedIncludeTags" class="d-flex flex-wrap gap-1 mb-2">
+                                <!-- Selected include tags will appear here -->
+                            </div>
+                            <select class="form-select form-select-sm" id="includeTagSelect" onchange="addIncludeTag()">
+                                <option value="">Add include tag...</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Exclude Tags (songs with these tags will be excluded)</label>
+                        <div id="excludeTagsContainer" class="border rounded p-2 mb-2" style="min-height: 60px;">
+                            <div id="selectedExcludeTags" class="d-flex flex-wrap gap-1 mb-2">
+                                <!-- Selected exclude tags will appear here -->
+                            </div>
+                            <select class="form-select form-select-sm" id="excludeTagSelect" onchange="addExcludeTag()">
+                                <option value="">Add exclude tag...</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-primary" onclick="generateDynamicPlaylist()">Generate Playlist</button>
+                        <button class="btn btn-outline-success" onclick="saveDynamicPlaylist()" id="saveDynamicBtn" disabled>Save Dynamic Playlist</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Music Player and Playlist -->
+    <div class="col-md-8">
+        <!-- Music Player Controls -->
+        <div class="card mb-3">
+            <div class="card-header">
+                <h5 class="mb-0">Now Playing</h5>
+            </div>
+            <div class="card-body">
+                <div id="nowPlayingInfo" class="text-center mb-3">
+                    <div id="noSongSelected" class="text-muted">
+                        <i class="fas fa-music fa-2x mb-2"></i>
+                        <p>No song selected</p>
+                    </div>
+                    <div id="currentSongInfo" style="display: none;">
+                        <h4 id="currentSongTitle">Song Title</h4>
+                        <p class="text-muted mb-1" id="currentSongArtist">Artist</p>
+                        <small class="text-info" id="currentSongStats">Stats</small>
+                    </div>
+                </div>
+                
+                <!-- Audio Element -->
+                <audio id="audioPlayer" style="display: none;" preload="metadata"></audio>
+                
+                <!-- Progress Bar -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between small text-muted mb-1">
+                        <span id="currentTime">0:00</span>
+                        <span id="totalTime">0:00</span>
+                    </div>
+                    <div class="progress" style="height: 6px; cursor: pointer;" onclick="seekToPosition(event)">
+                        <div class="progress-bar" id="progressBar" role="progressbar" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <!-- Playback Controls -->
+                <div class="d-flex justify-content-center align-items-center gap-2 mb-3">
+                    <button class="btn btn-outline-secondary" onclick="skipBackward()" id="skipBackBtn" disabled>
+                        <i class="fas fa-step-backward"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="seekRelative(-20)" id="rewind20Btn" disabled>
+                        <i class="fas fa-undo"></i> 20s
+                    </button>
+                    <button class="btn btn-success btn-lg" onclick="togglePlayPause()" id="playPauseBtn" disabled>
+                        <i class="fas fa-play"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="seekRelative(20)" id="forward20Btn" disabled>
+                        20s <i class="fas fa-redo"></i>
+                    </button>
+                    <button class="btn btn-outline-secondary" onclick="skipForward()" id="skipForwardBtn" disabled>
+                        <i class="fas fa-step-forward"></i>
+                    </button>
+                </div>
+                
+                <!-- Volume Control -->
+                <div class="d-flex justify-content-center align-items-center gap-2 mb-3">
+                    <i class="fas fa-volume-down"></i>
+                    <input type="range" class="form-range" id="volumeSlider" min="0" max="100" value="70" style="width: 150px;" onchange="setVolume(this.value)">
+                    <i class="fas fa-volume-up"></i>
+                </div>
+                
+                <!-- Playback Mode Controls -->
+                <div class="d-flex justify-content-center align-items-center gap-2">
+                    <div class="btn-group" role="group" aria-label="Playback modes">
+                        <input type="radio" class="btn-check" name="playbackMode" id="playOnce" value="once" checked>
+                        <label class="btn btn-outline-info btn-sm" for="playOnce" onclick="setPlaybackMode('once')">
+                            <i class="fas fa-play"></i> Play Once
+                        </label>
+
+                        <input type="radio" class="btn-check" name="playbackMode" id="loopPlaylist" value="loop">
+                        <label class="btn btn-outline-info btn-sm" for="loopPlaylist" onclick="setPlaybackMode('loop')">
+                            <i class="fas fa-redo"></i> Loop
+                        </label>
+
+                        <input type="radio" class="btn-check" name="playbackMode" id="shuffleLoop" value="shuffle-loop">
+                        <label class="btn btn-outline-info btn-sm" for="shuffleLoop" onclick="setPlaybackMode('shuffle-loop')">
+                            <i class="fas fa-random"></i> Shuffle & Loop
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Current Playlist Display -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0" id="currentPlaylistTitle">No Playlist Selected</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary" onclick="shufflePlaylist()" id="shuffleBtn" disabled>
+                        <i class="fas fa-random"></i> Shuffle
+                    </button>
+                    <button class="btn btn-sm btn-outline-success" onclick="playFromStart()" id="playBtn" disabled>
+                        <i class="fas fa-play"></i> Play
+                    </button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="currentPlaylistSongs">
+                    <div class="text-center text-muted py-5">
+                        <i class="fas fa-music fa-3x mb-3"></i>
+                        <p>Select a playlist to start playing music</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Save Dynamic Playlist Modal -->
+<div class="modal fade" id="saveDynamicModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Save Dynamic Playlist</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <form id="saveDynamicForm">
+                    <div class="mb-3">
+                        <label for="dynamicPlaylistName" class="form-label">Playlist Name</label>
+                        <input type="text" class="form-control" id="dynamicPlaylistName" required>
+                        <div class="form-text">e.g., "Spooky Forest", "Lively Town", "Boss Battle"</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="dynamicPlaylistDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="dynamicPlaylistDescription" rows="3"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveDynamicPlaylistConfirm()">Save</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentPlaylistSongs = [];
+let allTags = [];
+let staticPlaylists = [];
+let dynamicPlaylists = [];
+let currentIncludeTags = [];
+let currentExcludeTags = [];
+let currentPlaylistType = '';
+
+// Music player state
+let currentSongIndex = -1;
+let audioPlayer = null;
+let isPlaying = false;
+let isDragging = false;
+let playbackMode = 'once'; // 'once', 'loop', 'shuffle-loop'
+let originalPlaylistOrder = []; // Store original order for shuffle mode
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadInitialData();
+    initializeAudioPlayer();
+    initializeDragAndDrop();
+});
+
+function initializeAudioPlayer() {
+    audioPlayer = document.getElementById('audioPlayer');
+    
+    audioPlayer.addEventListener('loadedmetadata', updateTotalTime);
+    audioPlayer.addEventListener('timeupdate', function() {
+        if (!isDragging) {
+            updateProgress();
+        }
+    });
+    audioPlayer.addEventListener('ended', skipForward);
+    audioPlayer.addEventListener('error', function(e) {
+        console.error('Audio error:', e);
+        isPlaying = false;
+        updatePlayPauseButton();
+    });
+    audioPlayer.addEventListener('pause', function() {
+        isPlaying = false;
+        updatePlayPauseButton();
+        renderCurrentPlaylist(); // Update display to remove playing indicator
+    });
+    audioPlayer.addEventListener('play', function() {
+        isPlaying = true;
+        updatePlayPauseButton();
+        renderCurrentPlaylist(); // Update display to show playing indicator
+    });
+    
+    // Initialize volume
+    audioPlayer.volume = 0.7;
+    document.getElementById('volumeSlider').value = 70;
+    
+    // Initialize player controls as disabled
+    document.getElementById('playPauseBtn').disabled = true;
+    document.getElementById('skipBackBtn').disabled = true;
+    document.getElementById('skipForwardBtn').disabled = true;
+    document.getElementById('rewind20Btn').disabled = true;
+    document.getElementById('forward20Btn').disabled = true;
+}
+
+function initializeDragAndDrop() {
+    // Will be called after playlist is rendered
+}
+
+async function loadInitialData() {
+    try {
+        // Load all tags
+        const tagsResponse = await fetch('/api/tags/');
+        allTags = await tagsResponse.json();
+        
+        // Load static playlists
+        const staticResponse = await fetch('/api/playlists/');
+        staticPlaylists = await staticResponse.json();
+        
+        // Load dynamic playlists
+        const dynamicResponse = await fetch('/api/dynamic-playlists/');
+        dynamicPlaylists = await dynamicResponse.json();
+        
+        populateSelectors();
+    } catch (error) {
+        console.error('Error loading initial data:', error);
+    }
+}
+
+function populateSelectors() {
+    // Populate static playlists
+    const staticSelect = document.getElementById('staticPlaylistSelect');
+    staticSelect.innerHTML = '<option value="">Select playlist...</option>';
+    staticPlaylists.forEach(playlist => {
+        const option = document.createElement('option');
+        option.value = playlist.id;
+        option.textContent = playlist.name;
+        staticSelect.appendChild(option);
+    });
+    
+    // Populate dynamic playlists
+    const dynamicSelect = document.getElementById('dynamicPlaylistSelect');
+    dynamicSelect.innerHTML = '<option value="">Select dynamic playlist...</option>';
+    dynamicPlaylists.forEach(playlist => {
+        const option = document.createElement('option');
+        option.value = playlist.id;
+        option.textContent = playlist.name;
+        dynamicSelect.appendChild(option);
+    });
+    
+    // Populate tag selectors
+    const includeSelect = document.getElementById('includeTagSelect');
+    const excludeSelect = document.getElementById('excludeTagSelect');
+    
+    includeSelect.innerHTML = '<option value="">Add include tag...</option>';
+    excludeSelect.innerHTML = '<option value="">Add exclude tag...</option>';
+    
+    allTags.forEach(tag => {
+        const includeOption = document.createElement('option');
+        includeOption.value = tag.id;
+        includeOption.textContent = tag.name;
+        includeSelect.appendChild(includeOption);
+        
+        const excludeOption = document.createElement('option');
+        excludeOption.value = tag.id;
+        excludeOption.textContent = tag.name;
+        excludeSelect.appendChild(excludeOption);
+    });
+}
+
+function onPlaylistTypeChange() {
+    const playlistType = document.getElementById('playlistType').value;
+    currentPlaylistType = playlistType;
+    
+    // Hide all sections
+    document.getElementById('staticPlaylistsSection').style.display = 'none';
+    document.getElementById('dynamicPlaylistsSection').style.display = 'none';
+    document.getElementById('customDynamicSection').style.display = 'none';
+    
+    // Show relevant section
+    if (playlistType === 'static') {
+        document.getElementById('staticPlaylistsSection').style.display = 'block';
+    } else if (playlistType === 'dynamic') {
+        document.getElementById('dynamicPlaylistsSection').style.display = 'block';
+    } else if (playlistType === 'custom') {
+        document.getElementById('customDynamicSection').style.display = 'block';
+    }
+    
+    // Clear current playlist
+    clearCurrentPlaylist();
+}
+
+async function loadStaticPlaylist() {
+    const playlistId = document.getElementById('staticPlaylistSelect').value;
+    if (!playlistId) return;
+    
+    try {
+        const response = await fetch(`/api/playlists/${playlistId}`);
+        const playlist = await response.json();
+        
+        currentPlaylistSongs = playlist.songs || [];
+        originalPlaylistOrder = []; // Reset original order for new playlist
+        document.getElementById('currentPlaylistTitle').textContent = playlist.name;
+        renderCurrentPlaylist();
+        enablePlaylistControls();
+    } catch (error) {
+        console.error('Error loading static playlist:', error);
+        alert('Error loading playlist');
+    }
+}
+
+async function loadDynamicPlaylist() {
+    const playlistId = document.getElementById('dynamicPlaylistSelect').value;
+    if (!playlistId) return;
+    
+    try {
+        const songsResponse = await fetch(`/api/dynamic-playlists/${playlistId}/songs`);
+        currentPlaylistSongs = await songsResponse.json();
+        originalPlaylistOrder = []; // Reset original order for new playlist
+        
+        const playlistResponse = await fetch(`/api/dynamic-playlists/${playlistId}`);
+        const playlist = await playlistResponse.json();
+        
+        document.getElementById('currentPlaylistTitle').textContent = `${playlist.name} (Dynamic)`;
+        renderCurrentPlaylist();
+        enablePlaylistControls();
+    } catch (error) {
+        console.error('Error loading dynamic playlist:', error);
+        alert('Error loading dynamic playlist');
+    }
+}
+
+function addIncludeTag() {
+    const select = document.getElementById('includeTagSelect');
+    const tagId = parseInt(select.value);
+    if (!tagId || currentIncludeTags.includes(tagId)) return;
+    
+    currentIncludeTags.push(tagId);
+    select.value = '';
+    renderSelectedTags();
+}
+
+function addExcludeTag() {
+    const select = document.getElementById('excludeTagSelect');
+    const tagId = parseInt(select.value);
+    if (!tagId || currentExcludeTags.includes(tagId)) return;
+    
+    currentExcludeTags.push(tagId);
+    select.value = '';
+    renderSelectedTags();
+}
+
+function renderSelectedTags() {
+    // Render include tags
+    const includeContainer = document.getElementById('selectedIncludeTags');
+    includeContainer.innerHTML = '';
+    currentIncludeTags.forEach(tagId => {
+        const tag = allTags.find(t => t.id === tagId);
+        if (tag) {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-success';
+            badge.innerHTML = `${tag.name} <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.6em;" onclick="removeIncludeTag(${tagId})"></button>`;
+            includeContainer.appendChild(badge);
+        }
+    });
+    
+    // Render exclude tags
+    const excludeContainer = document.getElementById('selectedExcludeTags');
+    excludeContainer.innerHTML = '';
+    currentExcludeTags.forEach(tagId => {
+        const tag = allTags.find(t => t.id === tagId);
+        if (tag) {
+            const badge = document.createElement('span');
+            badge.className = 'badge bg-danger';
+            badge.innerHTML = `${tag.name} <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.6em;" onclick="removeExcludeTag(${tagId})"></button>`;
+            excludeContainer.appendChild(badge);
+        }
+    });
+}
+
+function removeIncludeTag(tagId) {
+    currentIncludeTags = currentIncludeTags.filter(id => id !== tagId);
+    renderSelectedTags();
+}
+
+function removeExcludeTag(tagId) {
+    currentExcludeTags = currentExcludeTags.filter(id => id !== tagId);
+    renderSelectedTags();
+}
+
+async function generateDynamicPlaylist() {
+    try {
+        // Create a temporary dynamic playlist to get songs
+        const data = {
+            name: "Temporary",
+            description: "Temporary playlist for preview",
+            include_tag_ids: currentIncludeTags,
+            exclude_tag_ids: currentExcludeTags
+        };
+        
+        const response = await fetch('/api/dynamic-playlists/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            const playlist = await response.json();
+            
+            // Get the songs for this playlist
+            const songsResponse = await fetch(`/api/dynamic-playlists/${playlist.id}/songs`);
+            currentPlaylistSongs = await songsResponse.json();
+            
+            // Delete the temporary playlist
+            await fetch(`/api/dynamic-playlists/${playlist.id}`, { method: 'DELETE' });
+            
+            document.getElementById('currentPlaylistTitle').textContent = 'Custom Dynamic Playlist';
+            renderCurrentPlaylist();
+            enablePlaylistControls();
+            
+            // Enable save button
+            document.getElementById('saveDynamicBtn').disabled = false;
+        } else {
+            alert('Error generating dynamic playlist');
+        }
+    } catch (error) {
+        console.error('Error generating dynamic playlist:', error);
+        alert('Error generating dynamic playlist');
+    }
+}
+
+function renderCurrentPlaylist() {
+    const container = document.getElementById('currentPlaylistSongs');
+    
+    if (currentPlaylistSongs.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted py-5">
+                <p>No songs match the current criteria</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = `
+        <div class="mb-3">
+            <small class="text-muted">${currentPlaylistSongs.length} songs</small>
+        </div>
+        <div class="list-group" id="playlistContainer">
+            ${currentPlaylistSongs.map((song, index) => `
+                <div class="list-group-item d-flex justify-content-between align-items-center ${index === currentSongIndex ? 'active' : ''}" 
+                     data-song-index="${index}" 
+                     draggable="true" 
+                     ondragstart="dragStart(event)" 
+                     ondragover="dragOver(event)" 
+                     ondrop="drop(event)"
+                     style="cursor: grab;">
+                    <div class="d-flex align-items-center flex-grow-1" onclick="playSongAtIndex(${index})">
+                        <div class="me-3">
+                            <i class="fas fa-grip-vertical text-muted"></i>
+                        </div>
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center">
+                                <span class="badge bg-secondary me-2">${index + 1}</span>
+                                <div>
+                                    <h6 class="mb-1">${song.display_name}</h6>
+                                    <small class="text-muted">${song.artist || 'Unknown Artist'}</small>
+                                </div>
+                            </div>
+                            <div class="mt-1">
+                                <small class="text-info">E: ${(song.energy * 100).toFixed(0)}% | V: ${(song.valence * 100).toFixed(0)}% | D: ${(song.danceability * 100).toFixed(0)}%</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-1">
+                        ${index === currentSongIndex && isPlaying ? 
+                            '<i class="fas fa-volume-up text-primary me-2"></i>' : 
+                            index === currentSongIndex ? '<i class="fas fa-pause text-primary me-2"></i>' : ''
+                        }
+                        <button class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation(); previewSong(${song.id})">
+                            <i class="fas fa-headphones"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+    
+    setupDragAndDrop();
+}
+
+// Music Player Functions
+function playSongAtIndex(index) {
+    if (index < 0 || index >= currentPlaylistSongs.length) return;
+    
+    currentSongIndex = index;
+    const song = currentPlaylistSongs[index];
+    
+    // Update now playing info
+    document.getElementById('currentSongTitle').textContent = song.display_name;
+    document.getElementById('currentSongArtist').textContent = song.artist || 'Unknown Artist';
+    document.getElementById('currentSongStats').textContent = 
+        `E: ${(song.energy * 100).toFixed(0)}% | V: ${(song.valence * 100).toFixed(0)}% | D: ${(song.danceability * 100).toFixed(0)}%`;
+    
+    document.getElementById('noSongSelected').style.display = 'none';
+    document.getElementById('currentSongInfo').style.display = 'block';
+    
+    // Load and play the song
+    audioPlayer.src = `/api/songs/${song.id}/audio`;
+    audioPlayer.load();
+    audioPlayer.play().then(() => {
+        isPlaying = true;
+        updatePlayPauseButton();
+        enablePlayerControls();
+    }).catch(error => {
+        console.error('Error playing song:', error);
+    });
+    
+    // Update playlist display
+    renderCurrentPlaylist();
+}
+
+function togglePlayPause() {
+    if (currentSongIndex === -1) return;
+    
+    if (isPlaying) {
+        audioPlayer.pause();
+        isPlaying = false;
+    } else {
+        audioPlayer.play().then(() => {
+            isPlaying = true;
+        }).catch(error => {
+            console.error('Error playing song:', error);
+        });
+    }
+    updatePlayPauseButton();
+}
+
+function skipForward() {
+    if (currentSongIndex < currentPlaylistSongs.length - 1) {
+        playSongAtIndex(currentSongIndex + 1);
+    } else {
+        // End of playlist - handle based on playback mode
+        handleEndOfPlaylist();
+    }
+}
+
+function handleEndOfPlaylist() {
+    switch(playbackMode) {
+        case 'once':
+            // Stop playback at the end
+            stopPlayback();
+            break;
+        case 'loop':
+            // Restart from the beginning
+            if (currentPlaylistSongs.length > 0) {
+                playSongAtIndex(0);
+            }
+            break;
+        case 'shuffle-loop':
+            // Shuffle the playlist and start from the beginning
+            shufflePlaylistForLoop();
+            if (currentPlaylistSongs.length > 0) {
+                playSongAtIndex(0);
+            }
+            break;
+    }
+}
+
+function skipBackward() {
+    if (currentSongIndex > 0) {
+        playSongAtIndex(currentSongIndex - 1);
+    } else if (currentSongIndex === 0) {
+        // Restart current song
+        audioPlayer.currentTime = 0;
+    }
+}
+
+function seekRelative(seconds) {
+    if (audioPlayer && audioPlayer.duration) {
+        audioPlayer.currentTime = Math.max(0, Math.min(audioPlayer.duration, audioPlayer.currentTime + seconds));
+    }
+}
+
+function seekToPosition(event) {
+    if (!audioPlayer || !audioPlayer.duration) return;
+    
+    const progressBar = event.currentTarget;
+    const rect = progressBar.getBoundingClientRect();
+    const clickX = event.clientX - rect.left;
+    const percentage = clickX / rect.width;
+    
+    audioPlayer.currentTime = audioPlayer.duration * percentage;
+}
+
+function setVolume(value) {
+    if (audioPlayer) {
+        audioPlayer.volume = value / 100;
+    }
+}
+
+function updateProgress() {
+    if (!audioPlayer || !audioPlayer.duration) return;
+    
+    const percentage = (audioPlayer.currentTime / audioPlayer.duration) * 100;
+    document.getElementById('progressBar').style.width = percentage + '%';
+    
+    // Update current time
+    document.getElementById('currentTime').textContent = formatTime(audioPlayer.currentTime);
+}
+
+function updateTotalTime() {
+    if (audioPlayer && audioPlayer.duration) {
+        document.getElementById('totalTime').textContent = formatTime(audioPlayer.duration);
+    }
+}
+
+function formatTime(seconds) {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+function updatePlayPauseButton() {
+    const btn = document.getElementById('playPauseBtn');
+    const icon = btn.querySelector('i');
+    
+    if (isPlaying) {
+        icon.className = 'fas fa-pause';
+    } else {
+        icon.className = 'fas fa-play';
+    }
+}
+
+function enablePlayerControls() {
+    document.getElementById('playPauseBtn').disabled = false;
+    document.getElementById('skipBackBtn').disabled = false;
+    document.getElementById('skipForwardBtn').disabled = false;
+    document.getElementById('rewind20Btn').disabled = false;
+    document.getElementById('forward20Btn').disabled = false;
+}
+
+function stopPlayback() {
+    if (audioPlayer) {
+        audioPlayer.pause();
+        audioPlayer.currentTime = 0;
+    }
+    isPlaying = false;
+    currentSongIndex = -1;
+    
+    document.getElementById('noSongSelected').style.display = 'block';
+    document.getElementById('currentSongInfo').style.display = 'none';
+    
+    updatePlayPauseButton();
+    renderCurrentPlaylist();
+}
+
+// Drag and Drop Functions
+let draggedIndex = -1;
+
+function setupDragAndDrop() {
+    const container = document.getElementById('playlistContainer');
+    if (!container) return;
+    
+    container.addEventListener('dragover', function(e) {
+        e.preventDefault();
+    });
+}
+
+function dragStart(event) {
+    draggedIndex = parseInt(event.target.dataset.songIndex);
+    event.target.style.opacity = '0.5';
+}
+
+function dragOver(event) {
+    event.preventDefault();
+}
+
+function drop(event) {
+    event.preventDefault();
+    
+    const targetIndex = parseInt(event.currentTarget.dataset.songIndex);
+    
+    if (draggedIndex !== -1 && draggedIndex !== targetIndex) {
+        // Reorder the songs
+        const draggedSong = currentPlaylistSongs[draggedIndex];
+        currentPlaylistSongs.splice(draggedIndex, 1);
+        currentPlaylistSongs.splice(targetIndex, 0, draggedSong);
+        
+        // Update current song index if needed
+        if (currentSongIndex === draggedIndex) {
+            currentSongIndex = targetIndex;
+        } else if (draggedIndex < currentSongIndex && targetIndex >= currentSongIndex) {
+            currentSongIndex--;
+        } else if (draggedIndex > currentSongIndex && targetIndex <= currentSongIndex) {
+            currentSongIndex++;
+        }
+        
+        renderCurrentPlaylist();
+    }
+    
+    // Reset drag state
+    draggedIndex = -1;
+    event.currentTarget.style.opacity = '1';
+}
+
+document.addEventListener('dragend', function(event) {
+    event.target.style.opacity = '1';
+});
+
+// Shuffle function
+function shufflePlaylist() {
+    if (currentPlaylistSongs.length <= 1) return;
+    
+    // Store original order if not already stored
+    if (originalPlaylistOrder.length === 0) {
+        originalPlaylistOrder = [...currentPlaylistSongs];
+    }
+    
+    // Store current song if playing
+    const currentSong = currentSongIndex >= 0 ? currentPlaylistSongs[currentSongIndex] : null;
+    
+    // Fisher-Yates shuffle
+    for (let i = currentPlaylistSongs.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [currentPlaylistSongs[i], currentPlaylistSongs[j]] = [currentPlaylistSongs[j], currentPlaylistSongs[i]];
+    }
+    
+    // Find new index of current song if it was playing
+    if (currentSong) {
+        currentSongIndex = currentPlaylistSongs.findIndex(song => song.id === currentSong.id);
+    } else {
+        currentSongIndex = -1;
+    }
+    
+    // Re-render the playlist
+    renderCurrentPlaylist();
+    
+    // Show feedback
+    const btn = document.getElementById('shuffleBtn');
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-check"></i> Shuffled!';
+    btn.disabled = true;
+    
+    setTimeout(() => {
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+    }, 1500);
+}
+
+// Playback mode functions
+function setPlaybackMode(mode) {
+    playbackMode = mode;
+    
+    // Store original order when switching to shuffle-loop mode
+    if (mode === 'shuffle-loop' && originalPlaylistOrder.length === 0) {
+        originalPlaylistOrder = [...currentPlaylistSongs];
+    }
+    
+    // Visual feedback
+    const modeText = mode === 'once' ? 'Play Once' : mode === 'loop' ? 'Loop' : 'Shuffle & Loop';
+    console.log(`Playback mode set to: ${modeText}`);
+    
+    // Show temporary feedback
+    showPlaybackModeNotification(modeText);
+}
+
+function shufflePlaylistForLoop() {
+    if (currentPlaylistSongs.length <= 1) return;
+    
+    // Fisher-Yates shuffle - don't preserve current song position since this is end-of-playlist
+    for (let i = currentPlaylistSongs.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [currentPlaylistSongs[i], currentPlaylistSongs[j]] = [currentPlaylistSongs[j], currentPlaylistSongs[i]];
+    }
+}
+
+function showPlaybackModeNotification(modeText) {
+    // Create or update notification
+    let notification = document.getElementById('playbackModeNotification');
+    if (!notification) {
+        notification = document.createElement('div');
+        notification.id = 'playbackModeNotification';
+        notification.className = 'alert alert-info alert-dismissible fade show position-fixed';
+        notification.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 200px;';
+        document.body.appendChild(notification);
+    }
+    
+    notification.innerHTML = `
+        <i class="fas fa-music me-2"></i>
+        <strong>Playback Mode:</strong> ${modeText}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    
+    // Auto-dismiss after 3 seconds
+    setTimeout(() => {
+        if (notification && notification.parentNode) {
+            notification.remove();
+        }
+    }, 3000);
+}
+
+function enablePlaylistControls() {
+    document.getElementById('shuffleBtn').disabled = false;
+    document.getElementById('playBtn').disabled = false;
+}
+
+function clearCurrentPlaylist() {
+    currentPlaylistSongs = [];
+    document.getElementById('currentPlaylistTitle').textContent = 'No Playlist Selected';
+    document.getElementById('currentPlaylistSongs').innerHTML = `
+        <div class="text-center text-muted py-5">
+            <i class="fas fa-music fa-3x mb-3"></i>
+            <p>Select a playlist to start playing music</p>
+        </div>
+    `;
+    document.getElementById('shuffleBtn').disabled = true;
+    document.getElementById('playBtn').disabled = true;
+    document.getElementById('saveDynamicBtn').disabled = true;
+}
+
+function shufflePlaylist() {
+    for (let i = currentPlaylistSongs.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [currentPlaylistSongs[i], currentPlaylistSongs[j]] = [currentPlaylistSongs[j], currentPlaylistSongs[i]];
+    }
+    renderCurrentPlaylist();
+}
+
+function playFromStart() {
+    if (currentPlaylistSongs.length > 0) {
+        playSongAtIndex(0);
+    }
+}
+
+function previewSong(songId) {
+    // You can implement a more sophisticated audio player here
+    window.open(`/api/songs/${songId}/preview?segment=0`, '_blank');
+}
+
+function saveDynamicPlaylist() {
+    const modal = new bootstrap.Modal(document.getElementById('saveDynamicModal'));
+    modal.show();
+}
+
+async function saveDynamicPlaylistConfirm() {
+    const name = document.getElementById('dynamicPlaylistName').value;
+    const description = document.getElementById('dynamicPlaylistDescription').value;
+    
+    if (!name.trim()) {
+        alert('Please enter a name for the playlist');
+        return;
+    }
+    
+    try {
+        const data = {
+            name: name,
+            description: description,
+            include_tag_ids: currentIncludeTags,
+            exclude_tag_ids: currentExcludeTags
+        };
+        
+        const response = await fetch('/api/dynamic-playlists/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            const modal = bootstrap.Modal.getInstance(document.getElementById('saveDynamicModal'));
+            modal.hide();
+            document.getElementById('saveDynamicForm').reset();
+            
+            // Reload dynamic playlists
+            await loadInitialData();
+            alert('Dynamic playlist saved successfully!');
+        } else {
+            alert('Error saving dynamic playlist');
+        }
+    } catch (error) {
+        console.error('Error saving dynamic playlist:', error);
+        alert('Error saving dynamic playlist');
+    }
+}
+</script>
+{% endblock %}

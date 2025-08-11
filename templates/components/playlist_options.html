@@ -1,0 +1,76 @@
+<!-- Playlist Options Component -->
+<!-- This component provides common playlist actions and settings -->
+<div class="card">
+    <div class="card-header">
+        <h6 class="mb-0">Playlist Options</h6>
+    </div>
+    <div class="card-body">
+        <!-- Top Row: Playback Settings and Statistics -->
+        <div class="row mb-3">
+            <!-- Playback Settings -->
+            <div class="col-md-6">
+                <label class="form-label small fw-bold">Playback Settings</label>
+                <div class="d-flex flex-column gap-2">
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="shuffleEnabled" onchange="updatePlaybackSettings()">
+                        <label class="form-check-label small" for="shuffleEnabled">
+                            <i class="fas fa-random me-1"></i> Shuffle Mode
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="autoPlayEnabled" onchange="updatePlaybackSettings()">
+                        <label class="form-check-label small" for="autoPlayEnabled">
+                            <i class="fas fa-play-circle me-1"></i> Auto Play Next
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Playlist Statistics -->
+            <div class="col-md-6">
+                <label class="form-label small fw-bold">Statistics</label>
+                <div class="text-muted small">
+                    <div id="playlistStats">
+                        <div><strong>Songs:</strong> <span id="statsSongCount">0</span></div>
+                        <div><strong>Duration:</strong> <span id="statsTotalDuration">0:00</span></div>
+                        {% if playlist_type == 'dynamic' %}
+                        <div><strong>Matching:</strong> <span id="statsMatchingCount">0</span></div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bottom Row: Actions -->
+        <div class="row">
+            <!-- Quick Actions -->
+            <div class="col-md-8">
+                <label class="form-label small fw-bold">Quick Actions</label>
+                <div class="d-flex gap-1 flex-wrap">
+                    {% if playlist_type == 'dynamic' %}
+                    <button type="button" class="btn btn-sm btn-outline-info" onclick="rescanPlaylist()" id="rescanBtn">
+                        <i class="fas fa-sync me-1"></i> Rescan
+                    </button>
+                    {% else %}
+                    <button type="button" class="btn btn-sm btn-outline-warning" onclick="clearAllSongs()" id="clearAllBtn">
+                        <i class="fas fa-trash-alt me-1"></i> Remove All
+                    </button>
+                    {% endif %}
+                    <button type="button" class="btn btn-sm btn-outline-success" onclick="exportPlaylist()" id="exportBtn">
+                        <i class="fas fa-download me-1"></i> Export
+                    </button>
+                </div>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="col-md-4">
+                <label class="form-label small fw-bold text-danger">Danger Zone</label>
+                <div class="d-grid">
+                    <button type="button" class="btn btn-sm btn-outline-danger" onclick="deletePlaylist()">
+                        <i class="fas fa-trash-alt me-1"></i> Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

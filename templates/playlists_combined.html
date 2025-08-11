@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+
+{% block title %}Playlists - SoundShare{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1>Playlist Management</h1>
+                <p class="text-muted">Create, edit, and manage both static and dynamic playlists</p>
+            </div>
+            <div>
+                <a href="/playlists/create/static" class="btn btn-success me-2">
+                    <i class="fas fa-plus"></i> New Static Playlist
+                </a>
+                <a href="/playlists/create/dynamic" class="btn btn-primary">
+                    <i class="fas fa-magic"></i> New Dynamic Playlist
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Playlist Management Tabs -->
+<ul class="nav nav-tabs" id="playlistTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="static-playlists-tab" data-bs-toggle="tab" data-bs-target="#static-playlists" type="button" role="tab">
+            Static Playlists
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="dynamic-playlists-tab" data-bs-toggle="tab" data-bs-target="#dynamic-playlists" type="button" role="tab">
+            Dynamic Playlists
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content" id="playlistTabContent">
+    <!-- Static Playlists Tab -->
+    <div class="tab-pane fade show active" id="static-playlists" role="tabpanel">
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">Static Playlists</h5>
+                <small class="text-muted">Custom playlists with manually selected songs</small>
+            </div>
+            <div class="card-body">
+                <div id="staticPlaylistsList">
+                    <!-- Static playlists will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dynamic Playlists Tab -->
+    <div class="tab-pane fade" id="dynamic-playlists" role="tabpanel">
+        <div class="card mt-3">
+            <div class="card-header">
+                <h5 class="mb-0">Dynamic Playlists</h5>
+                <small class="text-muted">Smart playlists that automatically update based on tag criteria. Use Rescan to refresh after tag changes.</small>
+            </div>
+            <div class="card-body">
+                <div id="dynamicPlaylistsList">
+                    <!-- Dynamic playlists will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let staticPlaylists = [];
+let dynamicPlaylists = [];
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadPlaylists();
+    checkForDeletedPlaylist();
+});
+
+function checkForDeletedPlaylist() {
+    const deletedPlaylist = sessionStorage.getItem('deletedPlaylist');
+    if (deletedPlaylist) {
+        const data = JSON.parse(deletedPlaylist);
+        const timeSinceDelete = Date.now() - data.timestamp;
+        
+        // Only show undo if less than 5 seconds have passed
+        if (timeSinceDelete < 5000) {
+            const remainingTime = Math.ceil((5000 - timeSinceDelete) / 1000);
+            showUndoNotification(data, remainingTime);
+        } else {
+            sessionStorage.removeItem('deletedPlaylist');
+        }
+    }
+}
+
+function showUndoNotification(deletedData, remainingTime) {
+    // Create undo notification
+    const notification = document.createElement('div');
+    notification.id = 'undoNotification';
+    notification.className = 'alert alert-warning alert-dismissible fade show position-fixed';
+    notification.style.cssText = 'top: 20px; right: 20px; z-index: 1050; min-width: 300px;';
+    
+    notification.innerHTML = `
+        <div class="d-flex align-items-center">
+            <div class="flex-grow-1">
+                <strong>${deletedData.name}</strong> playlist deleted
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-dark me-2" onclick="undoDelete()">
+                <i class="fas fa-undo"></i> Undo (<span id="countdown">${remainingTime}</span>s)
+            </button>
+            <button type="button" class="btn-close" onclick="dismissUndo()"></button>
+        </div>
+    `;
+    
+    document.body.appendChild(notification);
+    
+    // Start countdown
+    const countdownInterval = setInterval(() => {
+        remainingTime--;
+        const countdownEl = document.getElementById('countdown');
+        if (countdownEl) {
+            countdownEl.textContent = remainingTime;
+        }
+        
+        if (remainingTime <= 0) {
+            clearInterval(countdownInterval);
+            dismissUndo();
+        }
+    }, 1000);
+    
+    // Store interval ID for cleanup
+    notification.dataset.intervalId = countdownInterval;
+}
+
+function undoDelete() {
+    // For now, just show an alert explaining that undo is not implemented
+    // In a real application, you would restore the playlist from a backup/recycle bin
+    alert('Undo functionality would restore the playlist here.\nThis would require implementing a soft delete system in the backend.');
+    dismissUndo();
+}
+
+function dismissUndo() {
+    const notification = document.getElementById('undoNotification');
+    if (notification) {
+        // Clear countdown interval
+        if (notification.dataset.intervalId) {
+            clearInterval(parseInt(notification.dataset.intervalId));
+        }
+        notification.remove();
+    }
+    sessionStorage.removeItem('deletedPlaylist');
+}
+
+async function loadPlaylists() {
+    try {
+        const staticResponse = await fetch('/api/playlists/');
+        staticPlaylists = await staticResponse.json();
+        
+        const dynamicResponse = await fetch('/api/dynamic-playlists/');
+        dynamicPlaylists = await dynamicResponse.json();
+        
+        renderStaticPlaylists();
+        renderDynamicPlaylists();
+    } catch (error) {
+        console.error('Error loading playlists:', error);
+        document.getElementById('staticPlaylistsList').innerHTML = '<div class="alert alert-danger">Error loading static playlists</div>';
+        document.getElementById('dynamicPlaylistsList').innerHTML = '<div class="alert alert-danger">Error loading dynamic playlists</div>';
+    }
+}
+
+function renderStaticPlaylists() {
+    const container = document.getElementById('staticPlaylistsList');
+    
+    if (staticPlaylists.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-5">
+                <i class="fas fa-list fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No static playlists yet</h5>
+                <p class="text-muted">Create your first static playlist to get started</p>
+                <a href="/playlists/create/static" class="btn btn-primary">
+                    <i class="fas fa-plus"></i> Create Static Playlist
+                </a>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = staticPlaylists.map(playlist => `
+        <div class="card mb-3 playlist-card" onclick="window.location.href='/playlists/${playlist.id}'" style="cursor: pointer;">
+            <div class="card-body">
+                <h5 class="card-title mb-2">${playlist.name}</h5>
+                <p class="card-text text-muted mb-2">${playlist.description || 'No description'}</p>
+                <div class="d-flex align-items-center text-muted small">
+                    <span class="me-3">
+                        <i class="fas fa-music me-1"></i>
+                        ${playlist.songs ? playlist.songs.length : 0} songs
+                    </span>
+                    <span>
+                        <i class="fas fa-calendar me-1"></i>
+                        Created: ${new Date(playlist.created_at).toLocaleDateString()}
+                    </span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderDynamicPlaylists() {
+    const container = document.getElementById('dynamicPlaylistsList');
+    
+    if (dynamicPlaylists.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-5">
+                <i class="fas fa-magic fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No dynamic playlists yet</h5>
+                <p class="text-muted">Create smart playlists that automatically update based on tag criteria</p>
+                <a href="/playlists/create/dynamic" class="btn btn-primary">
+                    <i class="fas fa-magic"></i> Create Dynamic Playlist
+                </a>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = dynamicPlaylists.map(playlist => `
+        <div class="card mb-3 playlist-card" onclick="window.location.href='/playlists/dynamic/${playlist.id}'" style="cursor: pointer;">
+            <div class="card-body">
+                <h5 class="card-title mb-2">${playlist.name}</h5>
+                <p class="card-text text-muted mb-2">${playlist.description || 'No description'}</p>
+                <div class="mb-2">
+                    ${playlist.include_tags && playlist.include_tags.length > 0 ? `
+                        <div class="mb-1">
+                            <small class="text-muted me-2">Include Tags:</small>
+                            ${playlist.include_tags.map(tag => `<span class="badge bg-success me-1">${tag.name}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    ${playlist.exclude_tags && playlist.exclude_tags.length > 0 ? `
+                        <div class="mb-1">
+                            <small class="text-muted me-2">Exclude Tags:</small>
+                            ${playlist.exclude_tags.map(tag => `<span class="badge bg-danger me-1">${tag.name}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    ${playlist.include_groups && playlist.include_groups.length > 0 ? `
+                        <div class="mb-1">
+                            <small class="text-muted me-2">Include Groups:</small>
+                            ${playlist.include_groups.map(group => `<span class="badge bg-info me-1">${group.name}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    ${playlist.exclude_groups && playlist.exclude_groups.length > 0 ? `
+                        <div class="mb-1">
+                            <small class="text-muted me-2">Exclude Groups:</small>
+                            ${playlist.exclude_groups.map(group => `<span class="badge bg-warning me-1">${group.name}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+                <div class="text-muted small">
+                    <i class="fas fa-calendar me-1"></i>
+                    Created: ${new Date(playlist.created_at).toLocaleDateString()}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function deletePlaylist(type, playlistId, playlistName) {
+    if (!confirm(`Are you sure you want to delete the ${type} playlist "${playlistName}"? This action cannot be undone.`)) return;
+    
+    try {
+        const url = type === 'static' ? `/api/playlists/${playlistId}` : `/api/dynamic-playlists/${playlistId}`;
+        
+        const response = await fetch(url, { method: 'DELETE' });
+        
+        if (response.ok) {
+            await loadPlaylists();
+            alert(`Playlist "${playlistName}" deleted successfully.`);
+        } else {
+            throw new Error('Failed to delete playlist');
+        }
+    } catch (error) {
+        console.error('Error deleting playlist:', error);
+        alert('Error deleting playlist. Please try again.');
+    }
+}
+
+function previewSong(songId) {
+    window.open(`/api/songs/${songId}/preview?segment=0`, '_blank');
+}
+</script>
+
+<style>
+.playlist-card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transform: translateY(-2px);
+    transition: all 0.2s ease-in-out;
+}
+
+.playlist-card {
+    transition: all 0.2s ease-in-out;
+}
+</style>
+{% endblock %}

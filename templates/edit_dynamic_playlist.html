@@ -1,0 +1,1263 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Dynamic Playlist - SoundShare{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1>Edit Dynamic Playlist</h1>
+                <p class="text-muted">Modify smart playlist configuration and tag filters</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-info" onclick="rescanPlaylist()" id="rescanBtn">
+                    <i class="fas fa-sync"></i> Rescan
+                </button>
+                <a href="/playlists" class="btn btn-outline-secondary">
+                    <i class="fas fa-arrow-left"></i> Back to Playlists
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Playlist Details and Options -->
+<div class="row mb-4">
+    <!-- Playlist Details -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0">Playlist Details</h5>
+            </div>
+            <div class="card-body">
+                <form id="playlistForm">
+                    <!-- Basic Details Row -->
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="mb-3">
+                                <label for="playlistName" class="form-label">Playlist Name *</label>
+                                <input type="text" class="form-control" id="playlistName" required>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="playlistDescription" class="form-label">Description</label>
+                                <textarea class="form-control" id="playlistDescription" rows="1"></textarea>
+                            </div>
+                        </div>
+                        <div class="col-md-2">
+                            <div class="mb-3">
+                                <label class="form-label">&nbsp;</label>
+                                <div class="d-grid">
+                                    <button type="button" class="btn btn-success" onclick="savePlaylist()" id="saveBtn">
+                                        <i class="fas fa-save"></i> Save
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Audio Features Row -->
+                    <div class="row">
+                        <div class="col-12">
+                            <div class="mb-3">
+                                <h6>Audio Features</h6>
+                                <div class="row g-2">
+                                    <div class="col-md-4">
+                                        <label class="form-label small">Energy</label>
+                                        <select class="form-select form-select-sm" id="energyFilter" onchange="updatePreview()">
+                                            <option value="">Any Energy</option>
+                                            <option value="high">High (0.7+)</option>
+                                            <option value="medium">Medium (0.3-0.7)</option>
+                                            <option value="low">Low (0.0-0.3)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small">Mood</label>
+                                        <select class="form-select form-select-sm" id="valenceFilter" onchange="updatePreview()">
+                                            <option value="">Any Mood</option>
+                                            <option value="happy">Happy (0.7+)</option>
+                                            <option value="neutral">Neutral (0.3-0.7)</option>
+                                            <option value="sad">Sad (0.0-0.3)</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <label class="form-label small">Danceability</label>
+                                        <select class="form-select form-select-sm" id="danceabilityFilter" onchange="updatePreview()">
+                                            <option value="">Any Dance</option>
+                                            <option value="high">High (0.7+)</option>
+                                            <option value="medium">Medium (0.3-0.7)</option>
+                                            <option value="low">Low (0.0-0.3)</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Tags and Groups Row -->
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <h6>Include Tags</h6>
+                                <div id="includeTagsContainer" class="border rounded p-2 mb-1" style="min-height: 40px; max-height: 60px; overflow-y: auto;">
+                                    <div class="text-muted text-center py-1 small">Songs must have ALL these tags</div>
+                                </div>
+                                <select class="form-select form-select-sm mb-1" id="includeTagSelect" onchange="addIncludeTag()">
+                                    <option value="">Add include tag...</option>
+                                </select>
+                                
+                                <h6 class="mt-2 mb-1">Include Groups</h6>
+                                <div id="includeGroupsContainer" class="border rounded p-2 mb-1" style="min-height: 40px; max-height: 60px; overflow-y: auto;">
+                                    <div class="text-muted text-center py-1 small">Songs must have ANY tag from these groups</div>
+                                </div>
+                                <select class="form-select form-select-sm" id="includeGroupSelect" onchange="addIncludeGroup()">
+                                    <option value="">Add include group...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <h6>Exclude Tags</h6>
+                                <div id="excludeTagsContainer" class="border rounded p-2 mb-1" style="min-height: 40px; max-height: 60px; overflow-y: auto;">
+                                    <div class="text-muted text-center py-1 small">Songs must NOT have any of these tags</div>
+                                </div>
+                                <select class="form-select form-select-sm mb-1" id="excludeTagSelect" onchange="addExcludeTag()">
+                                    <option value="">Add exclude tag...</option>
+                                </select>
+                                
+                                <h6 class="mt-2 mb-1">Exclude Groups</h6>
+                                <div id="excludeGroupsContainer" class="border rounded p-2 mb-1" style="min-height: 40px; max-height: 60px; overflow-y: auto;">
+                                    <div class="text-muted text-center py-1 small">Songs must NOT have any tags from these groups</div>
+                                </div>
+                                <select class="form-select form-select-sm" id="excludeGroupSelect" onchange="addExcludeGroup()">
+                                    <option value="">Add exclude group...</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Playlist Options -->
+    <div class="col-lg-6">
+        {% set playlist_type = 'dynamic' %}
+        {% include 'components/playlist_options.html' %}
+    </div>
+</div>
+
+<div class="row">
+    <!-- Current Songs Section -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Current Songs</h5>
+                        <small class="text-muted">Songs matching current criteria</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#currentSongsSection">
+                        <i class="fas fa-chevron-up" id="currentSongsToggle"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="collapse show" id="currentSongsSection">
+                <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                    <!-- Filter Controls -->
+                    {% set search_id = 'currentSongsSearch' %}
+                    {% set sort_id = 'currentSongsSort' %}
+                    {% set tag_filter_id = 'currentSongsTagFilter' %}
+                    {% set filter_function = 'filterCurrentSongs()' %}
+                    {% include 'components/filter_controls.html' %}
+                    
+                    <div id="currentSongsContainer" class="sortable-container" style="min-height: 100px;">
+                        <div class="text-center py-4">
+                            <div class="spinner-border" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <p class="mt-2">Loading playlist data...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Song Preview Section -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <h5 class="mb-0">Song Preview</h5>
+                        <small class="text-muted">Preview songs matching your criteria</small>
+                    </div>
+                    <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#songPreviewSection">
+                        <i class="fas fa-chevron-up" id="songPreviewToggle"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="collapse show" id="songPreviewSection">
+                <div class="card-body" style="max-height: 600px; overflow-y: auto;">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span id="previewCount" class="text-muted">Loading preview...</span>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="clearPreviewFilters()">Clear Filters</button>
+                    </div>
+                </div>
+                
+                <div id="previewResults" class="row">
+                    <div class="col-12 text-center text-muted py-5">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                        <p class="mt-2">Loading playlist data...</p>
+                    </div>
+                </div>
+                
+                <!-- Pagination -->
+                <nav aria-label="Preview pagination" class="mt-4">
+                    <ul class="pagination justify-content-center" id="previewPagination">
+                        <!-- Pagination will be generated here -->
+                    </ul>
+                </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% include 'components/song_info_modal.html' %}
+
+<!-- Add SortableJS for potential drag and drop functionality -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<script>
+let playlistId = null;
+let allSongs = [];
+let allTags = [];
+let allGroups = [];
+let includeTags = [];
+let excludeTags = [];
+let includeGroups = [];
+let excludeGroups = [];
+let previewSongs = [];
+let matchingSongs = [];
+
+// Preview pagination
+let currentPage = 1;
+let songsPerPage = 12;
+
+// Current modal song for info display
+let currentModalSong = null;
+
+// Audio features
+let energyMin = null, energyMax = null;
+let valenceMin = null, valenceMax = null;
+let danceabilityMin = null, danceabilityMax = null;
+
+// Playback settings
+let shuffleEnabled = false;
+let autoPlayEnabled = false;
+
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParts = window.location.pathname.split('/');
+    playlistId = urlParts[urlParts.length - 1]; // Extract ID from URL like /playlists/edit/dynamic/123
+    
+    if (!playlistId || isNaN(parseInt(playlistId))) {
+        alert('No valid playlist ID provided');
+        window.location.href = '/playlists';
+        return;
+    }
+    
+    // Setup collapse toggle icons
+    setupCollapseToggles();
+    
+    loadAllData();
+});
+
+async function loadAllData() {
+    try {
+        // Load playlist details
+        const playlistResponse = await fetch(`/api/dynamic-playlists/${playlistId}`);
+        if (!playlistResponse.ok) {
+            throw new Error('Playlist not found');
+        }
+        const playlist = await playlistResponse.json();
+        
+        // Automatically rescan playlist when accessing edit page
+        try {
+            await fetch(`/api/dynamic-playlists/${playlistId}/rescan`, {
+                method: 'POST'
+            });
+        } catch (rescanError) {
+            console.warn('Auto-rescan failed:', rescanError);
+        }
+        
+        // Load all songs
+        const songsResponse = await fetch('/api/songs/');
+        allSongs = await songsResponse.json();
+        
+        // Load tags
+        const tagsResponse = await fetch('/api/tags/');
+        allTags = await tagsResponse.json();
+        
+        // Load groups
+        const groupsResponse = await fetch('/api/groups/');
+        allGroups = await groupsResponse.json();
+        
+        // Populate form with playlist data
+        document.getElementById('playlistName').value = playlist.name;
+        document.getElementById('playlistDescription').value = playlist.description || '';
+        
+        // Set current tags
+        includeTags = playlist.include_tags ? playlist.include_tags.map(tag => tag.id) : [];
+        excludeTags = playlist.exclude_tags ? playlist.exclude_tags.map(tag => tag.id) : [];
+        
+        // Set current groups (if the API supports it, otherwise empty arrays)
+        includeGroups = playlist.include_groups ? playlist.include_groups.map(group => group.id) : [];
+        excludeGroups = playlist.exclude_groups ? playlist.exclude_groups.map(group => group.id) : [];
+        
+        // Set audio feature filters
+        setAudioFeatureFilters(playlist);
+        
+        // Set playback settings
+        shuffleEnabled = playlist.shuffle_enabled || false;
+        autoPlayEnabled = playlist.auto_play_enabled || false;
+        document.getElementById('shuffleEnabled').checked = shuffleEnabled;
+        document.getElementById('autoPlayEnabled').checked = autoPlayEnabled;
+        
+        // Initialize
+        renderTags();
+        renderGroups();
+        populateTagSelectors();
+        populateGroupSelectors();
+        updatePreview();
+        
+    } catch (error) {
+        console.error('Error loading data:', error);
+        alert('Error loading playlist. Returning to playlists page.');
+        window.location.href = '/playlists';
+    }
+}
+
+function setAudioFeatureFilters(playlist) {
+    // Set energy filter
+    if (playlist.energy_min !== null && playlist.energy_max !== null) {
+        if (playlist.energy_min >= 0.7) {
+            document.getElementById('energyFilter').value = 'high';
+        } else if (playlist.energy_min >= 0.3) {
+            document.getElementById('energyFilter').value = 'medium';
+        } else {
+            document.getElementById('energyFilter').value = 'low';
+        }
+    } else {
+        document.getElementById('energyFilter').value = '';
+    }
+    
+    // Set valence filter
+    if (playlist.valence_min !== null && playlist.valence_max !== null) {
+        if (playlist.valence_min >= 0.7) {
+            document.getElementById('valenceFilter').value = 'happy';
+        } else if (playlist.valence_min >= 0.3) {
+            document.getElementById('valenceFilter').value = 'neutral';
+        } else {
+            document.getElementById('valenceFilter').value = 'sad';
+        }
+    } else {
+        document.getElementById('valenceFilter').value = '';
+    }
+    
+    // Set danceability filter
+    if (playlist.danceability_min !== null && playlist.danceability_max !== null) {
+        if (playlist.danceability_min >= 0.7) {
+            document.getElementById('danceabilityFilter').value = 'high';
+        } else if (playlist.danceability_min >= 0.3) {
+            document.getElementById('danceabilityFilter').value = 'medium';
+        } else {
+            document.getElementById('danceabilityFilter').value = 'low';
+        }
+    } else {
+        document.getElementById('danceabilityFilter').value = '';
+    }
+}
+
+function populateTagSelectors() {
+    const includeSelect = document.getElementById('includeTagSelect');
+    const excludeSelect = document.getElementById('excludeTagSelect');
+    
+    // Clear and populate tag selectors
+    includeSelect.innerHTML = '<option value="">Add include tag...</option>';
+    excludeSelect.innerHTML = '<option value="">Add exclude tag...</option>';
+    
+    allTags.forEach(tag => {
+        // Only show tags not already selected
+        if (!includeTags.includes(tag.id) && !excludeTags.includes(tag.id)) {
+            const includeOption = document.createElement('option');
+            includeOption.value = tag.id;
+            includeOption.textContent = tag.name;
+            includeSelect.appendChild(includeOption);
+            
+            const excludeOption = document.createElement('option');
+            excludeOption.value = tag.id;
+            excludeOption.textContent = tag.name;
+            excludeSelect.appendChild(excludeOption);
+        }
+    });
+}
+
+function populateGroupSelectors() {
+    const includeSelect = document.getElementById('includeGroupSelect');
+    const excludeSelect = document.getElementById('excludeGroupSelect');
+    
+    // Clear and populate group selectors
+    includeSelect.innerHTML = '<option value="">Add include group...</option>';
+    excludeSelect.innerHTML = '<option value="">Add exclude group...</option>';
+    
+    allGroups.forEach(group => {
+        // Only show groups not already selected
+        if (!includeGroups.includes(group.id) && !excludeGroups.includes(group.id)) {
+            const includeOption = document.createElement('option');
+            includeOption.value = group.id;
+            includeOption.textContent = group.name;
+            includeSelect.appendChild(includeOption);
+            
+            const excludeOption = document.createElement('option');
+            excludeOption.value = group.id;
+            excludeOption.textContent = group.name;
+            excludeSelect.appendChild(excludeOption);
+        }
+    });
+}
+
+function addIncludeTag() {
+    const select = document.getElementById('includeTagSelect');
+    const tagId = parseInt(select.value);
+    
+    if (tagId && !includeTags.includes(tagId)) {
+        includeTags.push(tagId);
+        select.value = '';
+        renderTags();
+        populateTagSelectors();
+        updatePreview();
+    }
+}
+
+function addExcludeTag() {
+    const select = document.getElementById('excludeTagSelect');
+    const tagId = parseInt(select.value);
+    
+    if (tagId && !excludeTags.includes(tagId)) {
+        excludeTags.push(tagId);
+        select.value = '';
+        renderTags();
+        populateTagSelectors();
+        updatePreview();
+    }
+}
+
+function addIncludeGroup() {
+    const select = document.getElementById('includeGroupSelect');
+    const groupId = parseInt(select.value);
+    
+    if (groupId && !includeGroups.includes(groupId)) {
+        includeGroups.push(groupId);
+        select.value = '';
+        renderGroups();
+        populateGroupSelectors();
+        updatePreview();
+    }
+}
+
+function addExcludeGroup() {
+    const select = document.getElementById('excludeGroupSelect');
+    const groupId = parseInt(select.value);
+    
+    if (groupId && !excludeGroups.includes(groupId)) {
+        excludeGroups.push(groupId);
+        select.value = '';
+        renderGroups();
+        populateGroupSelectors();
+        updatePreview();
+    }
+}
+
+function removeIncludeTag(tagId) {
+    includeTags = includeTags.filter(id => id !== tagId);
+    renderTags();
+    populateTagSelectors();
+    updatePreview();
+}
+
+function removeExcludeTag(tagId) {
+    excludeTags = excludeTags.filter(id => id !== tagId);
+    renderTags();
+    populateTagSelectors();
+    updatePreview();
+}
+
+function removeIncludeGroup(groupId) {
+    includeGroups = includeGroups.filter(id => id !== groupId);
+    renderGroups();
+    populateGroupSelectors();
+    updatePreview();
+}
+
+function removeExcludeGroup(groupId) {
+    excludeGroups = excludeGroups.filter(id => id !== groupId);
+    renderGroups();
+    populateGroupSelectors();
+    updatePreview();
+}
+
+function renderTags() {
+    // Render include tags
+    const includeContainer = document.getElementById('includeTagsContainer');
+    if (includeTags.length === 0) {
+        includeContainer.innerHTML = '<div class="text-muted text-center py-2">Songs must have ALL these tags</div>';
+    } else {
+        includeContainer.innerHTML = includeTags.map(tagId => {
+            const tag = allTags.find(t => t.id === tagId);
+            return tag ? `
+                <span class="badge bg-success me-1 mb-1">
+                    ${tag.name} 
+                    <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.6em;" onclick="removeIncludeTag(${tagId})"></button>
+                </span>
+            ` : '';
+        }).join('');
+    }
+    
+    // Render exclude tags
+    const excludeContainer = document.getElementById('excludeTagsContainer');
+    if (excludeTags.length === 0) {
+        excludeContainer.innerHTML = '<div class="text-muted text-center py-2">Songs must NOT have any of these tags</div>';
+    } else {
+        excludeContainer.innerHTML = excludeTags.map(tagId => {
+            const tag = allTags.find(t => t.id === tagId);
+            return tag ? `
+                <span class="badge bg-danger me-1 mb-1">
+                    ${tag.name} 
+                    <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.6em;" onclick="removeExcludeTag(${tagId})"></button>
+                </span>
+            ` : '';
+        }).join('');
+    }
+}
+
+function renderGroups() {
+    // Render include groups
+    const includeContainer = document.getElementById('includeGroupsContainer');
+    if (includeGroups.length === 0) {
+        includeContainer.innerHTML = '<div class="text-muted text-center py-2">Songs must have ANY tag from these groups</div>';
+    } else {
+        includeContainer.innerHTML = includeGroups.map(groupId => {
+            const group = allGroups.find(g => g.id === groupId);
+            return group ? `
+                <span class="badge bg-info me-1 mb-1">
+                    ${group.name} 
+                    <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.6em;" onclick="removeIncludeGroup(${groupId})"></button>
+                </span>
+            ` : '';
+        }).join('');
+    }
+    
+    // Render exclude groups
+    const excludeContainer = document.getElementById('excludeGroupsContainer');
+    if (excludeGroups.length === 0) {
+        excludeContainer.innerHTML = '<div class="text-muted text-center py-2">Songs must NOT have any tags from these groups</div>';
+    } else {
+        excludeContainer.innerHTML = excludeGroups.map(groupId => {
+            const group = allGroups.find(g => g.id === groupId);
+            return group ? `
+                <span class="badge bg-warning me-1 mb-1">
+                    ${group.name} 
+                    <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.6em;" onclick="removeExcludeGroup(${groupId})"></button>
+                </span>
+            ` : '';
+        }).join('');
+    }
+}
+
+function updatePreview() {
+    // Calculate matching songs based on current criteria
+    const matchingSongs = allSongs.filter(song => {
+        const songTagIds = song.tags ? song.tags.map(tag => tag.id) : [];
+        
+        // Check include tags (song must have ALL include tags)
+        if (includeTags.length > 0) {
+            const hasAllIncludeTags = includeTags.every(tagId => songTagIds.includes(tagId));
+            if (!hasAllIncludeTags) return false;
+        }
+        
+        // Check exclude tags (song must have NONE of the exclude tags)
+        if (excludeTags.length > 0) {
+            const hasAnyExcludeTag = excludeTags.some(tagId => songTagIds.includes(tagId));
+            if (hasAnyExcludeTag) return false;
+        }
+        
+        // Check include groups (song must have at least one tag from ANY of the include groups)
+        if (includeGroups.length > 0) {
+            const hasTagFromIncludeGroups = includeGroups.some(groupId => {
+                const group = allGroups.find(g => g.id === groupId);
+                if (!group || !group.tags) return false;
+                return group.tags.some(tag => songTagIds.includes(tag.id));
+            });
+            if (!hasTagFromIncludeGroups) return false;
+        }
+        
+        // Check exclude groups (song must NOT have any tags from ANY of the exclude groups)
+        if (excludeGroups.length > 0) {
+            const hasTagFromExcludeGroups = excludeGroups.some(groupId => {
+                const group = allGroups.find(g => g.id === groupId);
+                if (!group || !group.tags) return false;
+                return group.tags.some(tag => songTagIds.includes(tag.id));
+            });
+            if (hasTagFromExcludeGroups) return false;
+        }
+        
+        return true;
+    });
+    
+    // Apply additional filters for preview
+    const energyRange = document.getElementById('energyFilter').value;
+    const valenceRange = document.getElementById('valenceFilter').value;
+    const danceabilityRange = document.getElementById('danceabilityFilter').value;
+    
+    previewSongs = matchingSongs.filter(song => {
+        // Energy filter
+        if (energyRange) {
+            const energy = song.energy || 0;
+            switch(energyRange) {
+                case 'high': if (energy < 0.7) return false; break;
+                case 'medium': if (energy < 0.3 || energy >= 0.7) return false; break;
+                case 'low': if (energy >= 0.3) return false; break;
+            }
+        }
+        
+        // Valence filter
+        if (valenceRange) {
+            const valence = song.valence || 0;
+            switch(valenceRange) {
+                case 'happy': if (valence < 0.7) return false; break;
+                case 'neutral': if (valence < 0.3 || valence >= 0.7) return false; break;
+                case 'sad': if (valence >= 0.3) return false; break;
+            }
+        }
+        
+        // Danceability filter
+        if (danceabilityRange) {
+            const danceability = song.danceability || 0;
+            switch(danceabilityRange) {
+                case 'high': if (danceability < 0.7) return false; break;
+                case 'medium': if (danceability < 0.3 || danceability >= 0.7) return false; break;
+                case 'low': if (danceability >= 0.3) return false; break;
+            }
+        }
+        
+        return true;
+    });
+    
+    // Sort songs by name by default
+    previewSongs.sort((a, b) => (a.display_name || '').localeCompare(b.display_name || ''));
+    
+    // Update counts and statistics
+    document.getElementById('previewCount').textContent = `${previewSongs.length} songs (${matchingSongs.length} total matches)`;
+    
+    // Update playlist statistics
+    const totalDuration = matchingSongs.reduce((total, song) => total + (song.duration || 0), 0);
+    updatePlaylistStats({
+        songCount: matchingSongs.length,
+        totalDuration: totalDuration,
+        matchingCount: matchingSongs.length
+    });
+    
+    currentPage = 1;
+    renderCurrentSongs();
+    renderPreviewResults();
+    renderPreviewPagination();
+}
+
+function renderPreviewResults() {
+    const container = document.getElementById('previewResults');
+    
+    // Check if any criteria are specified
+    const hasTagCriteria = includeTags.length > 0 || excludeTags.length > 0;
+    const hasGroupCriteria = includeGroups.length > 0 || excludeGroups.length > 0;
+    const energyFilter = document.getElementById('energyFilter').value;
+    const valenceFilter = document.getElementById('valenceFilter').value;
+    const danceabilityFilter = document.getElementById('danceabilityFilter').value;
+    const hasAudioFeatureCriteria = energyFilter || valenceFilter || danceabilityFilter;
+    
+    if (!hasTagCriteria && !hasGroupCriteria && !hasAudioFeatureCriteria) {
+        container.innerHTML = `
+            <div class="col-12 text-center text-muted py-5">
+                <i class="fas fa-sliders-h fa-3x mb-3"></i>
+                <h5>Add criteria to see matching songs</h5>
+                <p>Use the tag/group selectors or audio feature filters to define your dynamic playlist criteria</p>
+            </div>
+        `;
+        return;
+    }
+    
+    if (previewSongs.length === 0) {
+        container.innerHTML = `
+            <div class="col-12 text-center text-muted py-5">
+                <i class="fas fa-search fa-3x mb-3"></i>
+                <h5>No songs match current criteria</h5>
+                <p>Try adjusting your tag selections or audio feature filters</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const startIndex = (currentPage - 1) * songsPerPage;
+    const endIndex = startIndex + songsPerPage;
+    const pagesSongs = previewSongs.slice(startIndex, endIndex);
+    
+    container.innerHTML = '';
+    
+    container.innerHTML = pagesSongs.map(song => `
+        <div class="song-item card mb-2" data-song-id="${song.id}">
+            <div class="card-body p-2">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <div class="fw-bold">${song.display_name}</div>
+                        <div class="text-muted small">${song.album || 'Unknown Album'} • ${getFolder(song.file_path) || 'Unknown Folder'}</div>
+                        ${song.tags && song.tags.length > 0 ? `
+                            <div class="mt-1">
+                                ${song.tags.map(tag => {
+                                    let badgeClass = 'bg-secondary';
+                                    if (includeTags.includes(tag.id)) badgeClass = 'bg-success';
+                                    if (excludeTags.includes(tag.id)) badgeClass = 'bg-danger';
+                                    return `<span class="badge ${badgeClass} me-1" style="font-size: 0.65em;">${tag.name}</span>`;
+                                }).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                    ${mediaPlayer.generatePlayer(song.id, { showInfo: true, showAdd: true, addAction: 'addSongToPlaylist', infoAction: 'showSongInfo' })}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderPreviewPagination() {
+    const totalPages = Math.ceil(previewSongs.length / songsPerPage);
+    const pagination = document.getElementById('previewPagination');
+    pagination.innerHTML = '';
+    
+    if (totalPages <= 1) return;
+    
+    // Previous button
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+    prevLi.innerHTML = `<a class="page-link" href="#" onclick="changePreviewPage(${currentPage - 1})">Previous</a>`;
+    pagination.appendChild(prevLi);
+    
+    // Page numbers (show max 5 pages around current)
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#" onclick="changePreviewPage(${i})">${i}</a>`;
+        pagination.appendChild(li);
+    }
+    
+    // Next button
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+    nextLi.innerHTML = `<a class="page-link" href="#" onclick="changePreviewPage(${currentPage + 1})">Next</a>`;
+    pagination.appendChild(nextLi);
+}
+
+function changePreviewPage(page) {
+    const totalPages = Math.ceil(previewSongs.length / songsPerPage);
+    if (page >= 1 && page <= totalPages) {
+        currentPage = page;
+        renderPreviewResults();
+        renderPreviewPagination();
+        // Scroll to top of results
+        document.getElementById('previewResults').scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+function clearPreviewFilters() {
+    updatePreview();
+}
+
+function updatePlaybackSettings() {
+    shuffleEnabled = document.getElementById('shuffleEnabled').checked;
+    autoPlayEnabled = document.getElementById('autoPlayEnabled').checked;
+}
+
+function clearAllTags() {
+    const hasCriteria = includeTags.length > 0 || excludeTags.length > 0 || includeGroups.length > 0 || excludeGroups.length > 0;
+    if (hasCriteria && !confirm('Clear all selected tags and groups?')) {
+        return;
+    }
+    
+    includeTags = [];
+    excludeTags = [];
+    includeGroups = [];
+    excludeGroups = [];
+    renderTags();
+    renderGroups();
+    populateTagSelectors();
+    populateGroupSelectors();
+    updatePreview();
+}
+
+function previewResults() {
+    updatePreview();
+    document.getElementById('previewResults').scrollIntoView({ behavior: 'smooth' });
+}
+
+async function savePlaylist() {
+    const name = document.getElementById('playlistName').value.trim();
+    const description = document.getElementById('playlistDescription').value.trim();
+    
+    if (!name) {
+        alert('Please enter a playlist name');
+        document.getElementById('playlistName').focus();
+        return;
+    }
+    
+    // Get audio feature filter values
+    const energyFilter = document.getElementById('energyFilter').value;
+    const valenceFilter = document.getElementById('valenceFilter').value;
+    const danceabilityFilter = document.getElementById('danceabilityFilter').value;
+    
+    // Check if at least one criteria is specified (tags, groups, or audio features)
+    const hasTagCriteria = includeTags.length > 0 || excludeTags.length > 0;
+    const hasGroupCriteria = includeGroups.length > 0 || excludeGroups.length > 0;
+    const hasAudioFeatureCriteria = energyFilter || valenceFilter || danceabilityFilter;
+    
+    if (!hasTagCriteria && !hasGroupCriteria && !hasAudioFeatureCriteria) {
+        alert('Please specify at least one criteria:\n• Add include/exclude tags or groups, OR\n• Select audio feature filters (Energy, Mood, or Dance)');
+        return;
+    }
+    
+    try {
+        // Get audio feature filter values
+        const energyFilter = document.getElementById('energyFilter').value;
+        const valenceFilter = document.getElementById('valenceFilter').value;
+        const danceabilityFilter = document.getElementById('danceabilityFilter').value;
+        
+        // Convert filter values to min/max ranges
+        let energyMin = null, energyMax = null;
+        let valenceMin = null, valenceMax = null;
+        let danceabilityMin = null, danceabilityMax = null;
+        
+        if (energyFilter === 'high') { energyMin = 0.7; energyMax = 1.0; }
+        else if (energyFilter === 'medium') { energyMin = 0.3; energyMax = 0.7; }
+        else if (energyFilter === 'low') { energyMin = 0.0; energyMax = 0.3; }
+        
+        if (valenceFilter === 'happy') { valenceMin = 0.7; valenceMax = 1.0; }
+        else if (valenceFilter === 'neutral') { valenceMin = 0.3; valenceMax = 0.7; }
+        else if (valenceFilter === 'sad') { valenceMin = 0.0; valenceMax = 0.3; }
+        
+        if (danceabilityFilter === 'high') { danceabilityMin = 0.7; danceabilityMax = 1.0; }
+        else if (danceabilityFilter === 'medium') { danceabilityMin = 0.3; danceabilityMax = 0.7; }
+        else if (danceabilityFilter === 'low') { danceabilityMin = 0.0; danceabilityMax = 0.3; }
+        
+        const playlistData = {
+            name,
+            description,
+            include_tag_ids: includeTags,
+            exclude_tag_ids: excludeTags,
+            include_group_ids: includeGroups,
+            exclude_group_ids: excludeGroups,
+            energy_min: energyMin,
+            energy_max: energyMax,
+            valence_min: valenceMin,
+            valence_max: valenceMax,
+            danceability_min: danceabilityMin,
+            danceability_max: danceabilityMax,
+            shuffle_enabled: shuffleEnabled,
+            auto_play_enabled: autoPlayEnabled
+        };
+        
+        const response = await fetch(`/api/dynamic-playlists/${playlistId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(playlistData)
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to update dynamic playlist');
+        }
+        
+        const matchingCount = allSongs.filter(song => {
+            const songTagIds = song.tags ? song.tags.map(tag => tag.id) : [];
+            
+            // Check include tags (song must have ALL include tags)
+            if (includeTags.length > 0) {
+                const hasAllIncludeTags = includeTags.every(tagId => songTagIds.includes(tagId));
+                if (!hasAllIncludeTags) return false;
+            }
+            
+            // Check exclude tags (song must have NONE of the exclude tags)
+            if (excludeTags.length > 0) {
+                const hasAnyExcludeTag = excludeTags.some(tagId => songTagIds.includes(tagId));
+                if (hasAnyExcludeTag) return false;
+            }
+            
+            // Check include groups (song must have at least one tag from ANY of the include groups)
+            if (includeGroups.length > 0) {
+                const hasTagFromIncludeGroups = includeGroups.some(groupId => {
+                    const group = allGroups.find(g => g.id === groupId);
+                    if (!group || !group.tags) return false;
+                    return group.tags.some(tag => songTagIds.includes(tag.id));
+                });
+                if (!hasTagFromIncludeGroups) return false;
+            }
+            
+            // Check exclude groups (song must NOT have any tags from ANY of the exclude groups)
+            if (excludeGroups.length > 0) {
+                const hasTagFromExcludeGroups = excludeGroups.some(groupId => {
+                    const group = allGroups.find(g => g.id === groupId);
+                    if (!group || !group.tags) return false;
+                    return group.tags.some(tag => songTagIds.includes(tag.id));
+                });
+                if (hasTagFromExcludeGroups) return false;
+            }
+            
+            // Apply audio feature filters
+            if (energyFilter) {
+                const energy = song.energy || 0;
+                switch(energyFilter) {
+                    case 'high': if (energy < 0.7) return false; break;
+                    case 'medium': if (energy < 0.3 || energy >= 0.7) return false; break;
+                    case 'low': if (energy >= 0.3) return false; break;
+                }
+            }
+            
+            if (valenceFilter) {
+                const valence = song.valence || 0;
+                switch(valenceFilter) {
+                    case 'happy': if (valence < 0.7) return false; break;
+                    case 'neutral': if (valence < 0.3 || valence >= 0.7) return false; break;
+                    case 'sad': if (valence >= 0.3) return false; break;
+                }
+            }
+            
+            if (danceabilityFilter) {
+                const danceability = song.danceability || 0;
+                switch(danceabilityFilter) {
+                    case 'high': if (danceability < 0.7) return false; break;
+                    case 'medium': if (danceability < 0.3 || danceability >= 0.7) return false; break;
+                    case 'low': if (danceability >= 0.3) return false; break;
+                }
+            }
+            
+            return true;
+        }).length;
+        
+        alert(`Dynamic playlist "${name}" updated successfully!\nCurrently matches ${matchingCount} songs.`);
+        window.location.href = '/playlists';
+        
+    } catch (error) {
+        console.error('Error updating dynamic playlist:', error);
+        alert('Error updating dynamic playlist. Please try again.');
+    }
+}
+
+async function deletePlaylist() {
+    if (!confirm('Are you sure you want to delete this dynamic playlist? This action cannot be undone.')) return;
+    
+    try {
+        const playlistName = document.getElementById('playlistName').value;
+        
+        const response = await fetch(`/api/dynamic-playlists/${playlistId}`, {
+            method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to delete playlist');
+        }
+        
+        // Redirect to playlists page with undo notification
+        sessionStorage.setItem('deletedPlaylist', JSON.stringify({
+            name: playlistName,
+            type: 'dynamic',
+            timestamp: Date.now()
+        }));
+        
+        window.location.href = '/playlists';
+        
+    } catch (error) {
+        console.error('Error deleting playlist:', error);
+        alert('Error deleting playlist. Please try again.');
+    }
+}
+
+async function rescanPlaylist() {
+    if (!playlistId) {
+        alert('Please save the playlist first before rescanning.');
+        return;
+    }
+    
+    const button = event.target.closest('button');
+    const originalHtml = button.innerHTML;
+    
+    try {
+        // Show loading state
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Rescanning...';
+        button.disabled = true;
+        
+        const response = await fetch(`/api/dynamic-playlists/${playlistId}/rescan`, {
+            method: 'POST'
+        });
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const result = await response.json();
+        
+        // Show success message
+        const playlistName = document.getElementById('playlistName').value || 'Playlist';
+        alert(`Rescan completed for "${playlistName}"!\n\nFound: ${result.song_count} songs\nFiles checked: ${result.files_checked}\nMissing files: ${result.missing_files}`);
+        
+        // Refresh the preview if it's currently showing
+        if (document.getElementById('songsContainer').children.length > 0) {
+            previewResults();
+        }
+        
+    } catch (error) {
+        console.error('Error rescanning playlist:', error);
+        alert('Error rescanning playlist. Please try again.');
+    } finally {
+        // Restore button state
+        button.innerHTML = originalHtml;
+        button.disabled = false;
+    }
+}
+
+// Setup collapse toggle icons using common function
+function setupCollapseToggles() {
+    window.setupCollapseToggles([
+        { sectionId: 'currentSongsSection', toggleId: 'currentSongsToggle' },
+        { sectionId: 'songPreviewSection', toggleId: 'songPreviewToggle' }
+    ]);
+}
+
+// Current Songs functionality
+let displayedCurrentSongs = [];
+
+function renderCurrentSongs() {
+    const container = document.getElementById('currentSongsContainer');
+    
+    // Check if any criteria are specified
+    const hasTagCriteria = includeTags.length > 0 || excludeTags.length > 0;
+    const hasGroupCriteria = includeGroups.length > 0 || excludeGroups.length > 0;
+    const energyFilter = document.getElementById('energyFilter').value;
+    const valenceFilter = document.getElementById('valenceFilter').value;
+    const danceabilityFilter = document.getElementById('danceabilityFilter').value;
+    const hasAudioFeatureCriteria = energyFilter || valenceFilter || danceabilityFilter;
+    
+    if (!hasTagCriteria && !hasGroupCriteria && !hasAudioFeatureCriteria) {
+        container.innerHTML = `
+            <div class="text-center py-4 text-muted">
+                <i class="fas fa-sliders-h fa-2x mb-3"></i>
+                <h6>Add criteria to see matching songs</h6>
+                <p>Use the tag/group selectors or audio feature filters to define your dynamic playlist criteria</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Calculate matching songs
+    const currentSongs = allSongs.filter(song => {
+        const songTagIds = song.tags ? song.tags.map(tag => tag.id) : [];
+        
+        // Check include tags (song must have ALL include tags)
+        if (includeTags.length > 0) {
+            const hasAllIncludeTags = includeTags.every(tagId => songTagIds.includes(tagId));
+            if (!hasAllIncludeTags) return false;
+        }
+        
+        // Check exclude tags (song must have NONE of the exclude tags)
+        if (excludeTags.length > 0) {
+            const hasAnyExcludeTag = excludeTags.some(tagId => songTagIds.includes(tagId));
+            if (hasAnyExcludeTag) return false;
+        }
+        
+        // Check include groups (song must have at least one tag from ANY of the include groups)
+        if (includeGroups.length > 0) {
+            const hasTagFromIncludeGroups = includeGroups.some(groupId => {
+                const group = allGroups.find(g => g.id === groupId);
+                if (!group || !group.tags) return false;
+                return group.tags.some(tag => songTagIds.includes(tag.id));
+            });
+            if (!hasTagFromIncludeGroups) return false;
+        }
+        
+        // Check exclude groups (song must NOT have any tags from ANY of the exclude groups)
+        if (excludeGroups.length > 0) {
+            const hasTagFromExcludeGroups = excludeGroups.some(groupId => {
+                const group = allGroups.find(g => g.id === groupId);
+                if (!group || !group.tags) return false;
+                return group.tags.some(tag => songTagIds.includes(tag.id));
+            });
+            if (hasTagFromExcludeGroups) return false;
+        }
+        
+        // Apply audio feature filters
+        const energyFilter = document.getElementById('energyFilter').value;
+        const valenceFilter = document.getElementById('valenceFilter').value;
+        const danceabilityFilter = document.getElementById('danceabilityFilter').value;
+        
+        if (energyFilter) {
+            const energy = song.energy || 0;
+            switch(energyFilter) {
+                case 'high': if (energy < 0.7) return false; break;
+                case 'medium': if (energy < 0.3 || energy >= 0.7) return false; break;
+                case 'low': if (energy >= 0.3) return false; break;
+            }
+        }
+        
+        if (valenceFilter) {
+            const valence = song.valence || 0;
+            switch(valenceFilter) {
+                case 'happy': if (valence < 0.7) return false; break;
+                case 'neutral': if (valence < 0.3 || valence >= 0.7) return false; break;
+                case 'sad': if (valence >= 0.3) return false; break;
+            }
+        }
+        
+        if (danceabilityFilter) {
+            const danceability = song.danceability || 0;
+            switch(danceabilityFilter) {
+                case 'high': if (danceability < 0.7) return false; break;
+                case 'medium': if (danceability < 0.3 || danceability >= 0.7) return false; break;
+                case 'low': if (danceability >= 0.3) return false; break;
+            }
+        }
+        
+        return true;
+    });
+    
+    displayedCurrentSongs = currentSongs;
+    populateCurrentSongsTagFilter();
+    filterCurrentSongs();
+}
+
+function populateCurrentSongsTagFilter() {
+    const tagFilter = document.getElementById('currentSongsTagFilter');
+    const uniqueTags = new Set();
+    
+    displayedCurrentSongs.forEach(song => {
+        if (song.tags) {
+            song.tags.forEach(tag => uniqueTags.add(tag.name));
+        }
+    });
+    
+    tagFilter.innerHTML = '<option value="">All Tags</option>';
+    Array.from(uniqueTags).sort().forEach(tagName => {
+        const option = document.createElement('option');
+        option.value = tagName;
+        option.textContent = tagName;
+        tagFilter.appendChild(option);
+    });
+}
+
+function filterCurrentSongs() {
+    const container = document.getElementById('currentSongsContainer');
+    const searchTerm = document.getElementById('currentSongsSearch').value.toLowerCase();
+    const sortBy = document.getElementById('currentSongsSort').value;
+    const tagFilter = document.getElementById('currentSongsTagFilter').value;
+    
+    if (displayedCurrentSongs.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-4 text-muted">
+                <i class="fas fa-search fa-2x mb-3"></i>
+                <h6>No songs match current criteria</h6>
+                <p>Try adjusting your tag selections or audio feature filters</p>
+            </div>
+        `;
+        return;
+    }
+    
+    // Filter songs
+    let filteredSongs = displayedCurrentSongs.filter(song => {
+        const matchesSearch = searchTerm === '' || 
+            song.display_name.toLowerCase().includes(searchTerm) ||
+            (song.artist || '').toLowerCase().includes(searchTerm) ||
+            (song.album || '').toLowerCase().includes(searchTerm);
+        
+        const matchesTag = tagFilter === '' || 
+            (song.tags && song.tags.some(tag => tag.name === tagFilter));
+        
+        return matchesSearch && matchesTag;
+    });
+    
+    // Sort songs
+    filteredSongs.sort((a, b) => {
+        switch (sortBy) {
+            case 'name':
+                return (a.display_name || '').localeCompare(b.display_name || '');
+            case 'artist':
+                return (a.artist || '').localeCompare(b.artist || '');
+            case 'album':
+                return (a.album || '').localeCompare(b.album || '');
+            default:
+                return 0;
+        }
+    });
+    
+    container.innerHTML = filteredSongs.slice(0, 50).map((song, index) => `
+        <div class="song-item card mb-2" data-song-id="${song.id}" data-index="${index}">
+            <div class="card-body p-2">
+                <div class="d-flex align-items-center">
+                    <div class="flex-grow-1">
+                        <div class="fw-bold">${song.display_name}</div>
+                        <div class="text-muted small">${song.album || 'Unknown Album'} • ${getFolder(song.file_path) || 'Unknown Folder'}</div>
+                        ${song.tags && song.tags.length > 0 ? `
+                            <div class="mt-1">
+                                ${song.tags.map(tag => {
+                                    let badgeClass = 'bg-secondary';
+                                    if (includeTags.includes(tag.id)) badgeClass = 'bg-success';
+                                    if (excludeTags.includes(tag.id)) badgeClass = 'bg-danger';
+                                    return `<span class="badge ${badgeClass} me-1" style="font-size: 0.65em;">${tag.name}</span>`;
+                                }).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                    ${mediaPlayer.generatePlayer(song.id, { showInfo: true, showAdd: false, infoAction: 'showSongInfo' })}
+                </div>
+            </div>
+        </div>
+    `).join('');
+    
+    if (filteredSongs.length > 50) {
+        container.innerHTML += `
+            <div class="text-center py-3 text-muted">
+                <small>Showing first 50 of ${filteredSongs.length} songs</small>
+            </div>
+        `;
+    }
+}
+
+// Song info modal functions (using common implementation)
+function showSongInfo(songId) {
+    // Use the common function with dynamic playlist specific parameters
+    window.showSongInfo(songId, allSongs, includeTags, excludeTags);
+}
+
+// Add song to playlist function (for dynamic playlists, this doesn't actually add but shows a message)
+function addSongToPlaylist(songId) {
+    const song = allSongs.find(s => s.id === songId);
+    if (!song) return;
+    
+    alert(`Note: This is a dynamic playlist. Songs are automatically included based on your tag and filter criteria.\n\n"${song.display_name}" will be included if it matches your current settings.`);
+}
+</script>
+
+{% include 'components/playlist_edit_styles.html' %}
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}SoundShare - D&D Campaign Music{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="jumbotron bg-primary text-white p-5 rounded">
+            <h1 class="display-4">Welcome to SoundShare</h1>
+            <p class="lead">Dynamic playlist management for your D&D campaigns</p>
+            <hr class="my-4">
+            <p>Create mood-based playlists using tags like "spooky forest", "lively town", or "fight against goofy clowns".</p>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">Songs</h5>
+                <p class="card-text">Upload and manage your music collection</p>
+                <a href="/songs" class="btn btn-primary">Manage Songs</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">Tags</h5>
+                <p class="card-text">Create and organize mood tags</p>
+                <a href="/tags" class="btn btn-secondary">Manage Tags</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">Playlists</h5>
+                <p class="card-text">Create traditional playlists</p>
+                <a href="/playlists" class="btn btn-success">Manage Playlists</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card">
+            <div class="card-body text-center">
+                <h5 class="card-title">Dynamic Playlists</h5>
+                <p class="card-text">Create tag-based dynamic playlists</p>
+                <a href="/dynamic-playlists" class="btn btn-warning">Dynamic Playlists</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

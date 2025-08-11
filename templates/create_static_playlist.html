@@ -1,0 +1,538 @@
+{% extends "base.html" %}
+
+{% block title %}Create Static Playlist - SoundShare{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1>Create Static Playlist</h1>
+                <p class="text-muted">Build a custom playlist by selecting individual songs</p>
+            </div>
+            <a href="/playlists" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Playlists
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Playlist Form -->
+    <div class="col-lg-4">
+        <div class="card sticky-top" style="top: 1rem;">
+            <div class="card-header">
+                <h5 class="mb-0">Playlist Details</h5>
+            </div>
+            <div class="card-body">
+                <form id="playlistForm">
+                    <div class="mb-3">
+                        <label for="playlistName" class="form-label">Playlist Name *</label>
+                        <input type="text" class="form-control" id="playlistName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="playlistDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="playlistDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>Selected Songs</h6>
+                        <div id="selectedSongsContainer" class="border rounded p-2" style="min-height: 200px; max-height: 300px; overflow-y: auto;">
+                            <div class="text-muted text-center py-3">No songs selected</div>
+                        </div>
+                        <small class="text-muted"><span id="selectedCount">0</span> songs selected</small>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-primary" onclick="savePlaylist()" id="saveBtn" disabled>
+                            <i class="fas fa-save"></i> Create Playlist
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" onclick="clearAllSelections()">
+                            <i class="fas fa-trash"></i> Clear All
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Song Browser -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Song Browser</h5>
+                <small class="text-muted">Search and select songs to add to your playlist</small>
+            </div>
+            <div class="card-body">
+                <!-- Advanced Filters -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label">Search Songs</label>
+                        <input type="text" class="form-control" id="searchFilter" placeholder="Search by name, artist, album..." onkeyup="applyFilters()">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Include Tags</label>
+                        <select class="form-select" id="includeTagFilter" onchange="applyFilters()">
+                            <option value="">All songs</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Exclude Tags</label>
+                        <select class="form-select" id="excludeTagFilter" onchange="applyFilters()">
+                            <option value="">No exclusions</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-3">
+                        <label class="form-label">Sort By</label>
+                        <select class="form-select" id="sortFilter" onchange="applyFilters()">
+                            <option value="name">Name</option>
+                            <option value="artist">Artist</option>
+                            <option value="energy">Energy (High to Low)</option>
+                            <option value="valence">Valence (High to Low)</option>
+                            <option value="danceability">Danceability (High to Low)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Energy Range</label>
+                        <select class="form-select" id="energyFilter" onchange="applyFilters()">
+                            <option value="">Any Energy</option>
+                            <option value="high">High Energy (70%+)</option>
+                            <option value="medium">Medium Energy (30-70%)</option>
+                            <option value="low">Low Energy (0-30%)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Mood Range</label>
+                        <select class="form-select" id="valenceFilter" onchange="applyFilters()">
+                            <option value="">Any Mood</option>
+                            <option value="positive">Positive (70%+)</option>
+                            <option value="neutral">Neutral (30-70%)</option>
+                            <option value="melancholy">Melancholy (0-30%)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Actions</label>
+                        <div class="d-grid">
+                            <button class="btn btn-outline-secondary btn-sm" onclick="clearFilters()">Clear Filters</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Song Results -->
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span id="songCount" class="text-muted">0 songs</span>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary" onclick="selectAllVisible()">Select All Visible</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="deselectAllVisible()">Deselect All Visible</button>
+                    </div>
+                </div>
+                
+                <div id="songResults" class="row">
+                    <!-- Songs will be displayed here -->
+                </div>
+                
+                <!-- Pagination -->
+                <nav aria-label="Song pagination" class="mt-4">
+                    <ul class="pagination justify-content-center" id="songPagination">
+                        <!-- Pagination will be generated here -->
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let allSongs = [];
+let filteredSongs = [];
+let selectedSongs = [];
+let allTags = [];
+
+// Pagination
+let currentPage = 1;
+let songsPerPage = 16;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadAllData();
+});
+
+async function loadAllData() {
+    try {
+        // Load songs with tags
+        const songsResponse = await fetch('/api/songs/');
+        allSongs = await songsResponse.json();
+        
+        // Load tags
+        const tagsResponse = await fetch('/api/tags/');
+        allTags = await tagsResponse.json();
+        
+        // Initialize filters
+        populateFilterSelectors();
+        applyFilters();
+        
+    } catch (error) {
+        console.error('Error loading data:', error);
+        alert('Error loading data. Please refresh the page.');
+    }
+}
+
+function populateFilterSelectors() {
+    const includeSelect = document.getElementById('includeTagFilter');
+    const excludeSelect = document.getElementById('excludeTagFilter');
+    
+    // Clear and populate tag filters
+    includeSelect.innerHTML = '<option value="">All songs</option>';
+    excludeSelect.innerHTML = '<option value="">No exclusions</option>';
+    
+    allTags.forEach(tag => {
+        const includeOption = document.createElement('option');
+        includeOption.value = tag.id;
+        includeOption.textContent = tag.name;
+        includeSelect.appendChild(includeOption);
+        
+        const excludeOption = document.createElement('option');
+        excludeOption.value = tag.id;
+        excludeOption.textContent = tag.name;
+        excludeSelect.appendChild(excludeOption);
+    });
+}
+
+function applyFilters() {
+    const searchTerm = document.getElementById('searchFilter').value.toLowerCase();
+    const includeTagId = parseInt(document.getElementById('includeTagFilter').value) || null;
+    const excludeTagId = parseInt(document.getElementById('excludeTagFilter').value) || null;
+    const sortBy = document.getElementById('sortFilter').value;
+    const energyRange = document.getElementById('energyFilter').value;
+    const valenceRange = document.getElementById('valenceFilter').value;
+    
+    filteredSongs = allSongs.filter(song => {
+        // Search filter
+        if (searchTerm) {
+            const searchFields = [
+                song.display_name?.toLowerCase() || '',
+                song.artist?.toLowerCase() || '',
+                song.album?.toLowerCase() || '',
+                song.filename?.toLowerCase() || ''
+            ].join(' ');
+            
+            if (!searchFields.includes(searchTerm)) {
+                return false;
+            }
+        }
+        
+        // Include tag filter
+        if (includeTagId) {
+            const songTagIds = song.tags ? song.tags.map(tag => tag.id) : [];
+            if (!songTagIds.includes(includeTagId)) {
+                return false;
+            }
+        }
+        
+        // Exclude tag filter
+        if (excludeTagId) {
+            const songTagIds = song.tags ? song.tags.map(tag => tag.id) : [];
+            if (songTagIds.includes(excludeTagId)) {
+                return false;
+            }
+        }
+        
+        // Energy filter
+        if (energyRange) {
+            const energy = song.energy || 0;
+            switch(energyRange) {
+                case 'high': if (energy < 0.7) return false; break;
+                case 'medium': if (energy < 0.3 || energy >= 0.7) return false; break;
+                case 'low': if (energy >= 0.3) return false; break;
+            }
+        }
+        
+        // Valence filter
+        if (valenceRange) {
+            const valence = song.valence || 0;
+            switch(valenceRange) {
+                case 'positive': if (valence < 0.7) return false; break;
+                case 'neutral': if (valence < 0.3 || valence >= 0.7) return false; break;
+                case 'melancholy': if (valence >= 0.3) return false; break;
+            }
+        }
+        
+        return true;
+    });
+    
+    // Sort songs
+    filteredSongs.sort((a, b) => {
+        switch (sortBy) {
+            case 'name':
+                return (a.display_name || '').localeCompare(b.display_name || '');
+            case 'artist':
+                return (a.artist || '').localeCompare(b.artist || '');
+            case 'energy':
+                return (b.energy || 0) - (a.energy || 0);
+            case 'valence':
+                return (b.valence || 0) - (a.valence || 0);
+            case 'danceability':
+                return (b.danceability || 0) - (a.danceability || 0);
+            default:
+                return 0;
+        }
+    });
+    
+    currentPage = 1;
+    renderSongResults();
+    renderPagination();
+    updateSongCount();
+}
+
+function renderSongResults() {
+    const startIndex = (currentPage - 1) * songsPerPage;
+    const endIndex = startIndex + songsPerPage;
+    const pagesSongs = filteredSongs.slice(startIndex, endIndex);
+    
+    const container = document.getElementById('songResults');
+    container.innerHTML = '';
+    
+    if (pagesSongs.length === 0) {
+        container.innerHTML = '<div class="col-12 text-center text-muted py-4">No songs match your filters</div>';
+        return;
+    }
+    
+    pagesSongs.forEach(song => {
+        const isSelected = selectedSongs.some(s => s.id === song.id);
+        const col = document.createElement('div');
+        col.className = 'col-md-6 col-lg-4 mb-3';
+        
+        col.innerHTML = `
+            <div class="card h-100 ${isSelected ? 'border-primary bg-light' : ''}">
+                <div class="card-body">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="checkbox" id="song-${song.id}" 
+                               ${isSelected ? 'checked' : ''} onchange="toggleSongSelection(${song.id})">
+                        <label class="form-check-label" for="song-${song.id}">
+                            <h6 class="card-title mb-1">${song.display_name}</h6>
+                        </label>
+                    </div>
+                    <p class="card-text">
+                        <small class="text-muted">${song.artist || 'Unknown Artist'}</small><br>
+                        <small class="text-info">
+                            E: ${(song.energy * 100).toFixed(0)}% | 
+                            V: ${(song.valence * 100).toFixed(0)}% | 
+                            D: ${(song.danceability * 100).toFixed(0)}%
+                        </small>
+                    </p>
+                    ${song.tags && song.tags.length > 0 ? `
+                        <div class="mb-2">
+                            ${song.tags.map(tag => `<span class="badge bg-secondary me-1 mb-1">${tag.name}</span>`).join('')}
+                        </div>
+                    ` : ''}
+                    <div class="d-grid gap-1">
+                        <button class="btn btn-sm btn-outline-primary" onclick="previewSong(${song.id})">
+                            <i class="fas fa-play"></i> Preview
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(col);
+    });
+}
+
+function renderPagination() {
+    const totalPages = Math.ceil(filteredSongs.length / songsPerPage);
+    const pagination = document.getElementById('songPagination');
+    pagination.innerHTML = '';
+    
+    if (totalPages <= 1) return;
+    
+    // Previous button
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+    prevLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage - 1})">Previous</a>`;
+    pagination.appendChild(prevLi);
+    
+    // Page numbers (show max 5 pages around current)
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#" onclick="changePage(${i})">${i}</a>`;
+        pagination.appendChild(li);
+    }
+    
+    // Next button
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+    nextLi.innerHTML = `<a class="page-link" href="#" onclick="changePage(${currentPage + 1})">Next</a>`;
+    pagination.appendChild(nextLi);
+}
+
+function changePage(page) {
+    const totalPages = Math.ceil(filteredSongs.length / songsPerPage);
+    if (page >= 1 && page <= totalPages) {
+        currentPage = page;
+        renderSongResults();
+        renderPagination();
+        // Scroll to top of results
+        document.getElementById('songResults').scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+function updateSongCount() {
+    document.getElementById('songCount').textContent = `${filteredSongs.length} songs`;
+}
+
+function toggleSongSelection(songId) {
+    const song = allSongs.find(s => s.id === songId);
+    if (!song) return;
+    
+    const existingIndex = selectedSongs.findIndex(s => s.id === songId);
+    if (existingIndex >= 0) {
+        selectedSongs.splice(existingIndex, 1);
+    } else {
+        selectedSongs.push(song);
+    }
+    
+    updateSelectedSongs();
+    renderSongResults();
+}
+
+function updateSelectedSongs() {
+    const container = document.getElementById('selectedSongsContainer');
+    const countElement = document.getElementById('selectedCount');
+    const saveBtn = document.getElementById('saveBtn');
+    
+    countElement.textContent = selectedSongs.length;
+    saveBtn.disabled = selectedSongs.length === 0;
+    
+    if (selectedSongs.length === 0) {
+        container.innerHTML = '<div class="text-muted text-center py-3">No songs selected</div>';
+        return;
+    }
+    
+    container.innerHTML = selectedSongs.map(song => `
+        <div class="d-flex justify-content-between align-items-center p-2 mb-1 bg-primary bg-opacity-10 rounded">
+            <div class="flex-grow-1">
+                <div class="fw-bold small">${song.display_name}</div>
+                <div class="text-muted" style="font-size: 0.8em;">${song.artist || 'Unknown Artist'}</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removeSongFromSelection(${song.id})">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function removeSongFromSelection(songId) {
+    const index = selectedSongs.findIndex(s => s.id === songId);
+    if (index >= 0) {
+        selectedSongs.splice(index, 1);
+        updateSelectedSongs();
+        renderSongResults();
+    }
+}
+
+function selectAllVisible() {
+    const startIndex = (currentPage - 1) * songsPerPage;
+    const endIndex = startIndex + songsPerPage;
+    const pagesSongs = filteredSongs.slice(startIndex, endIndex);
+    
+    pagesSongs.forEach(song => {
+        if (!selectedSongs.some(s => s.id === song.id)) {
+            selectedSongs.push(song);
+        }
+    });
+    
+    updateSelectedSongs();
+    renderSongResults();
+}
+
+function deselectAllVisible() {
+    const startIndex = (currentPage - 1) * songsPerPage;
+    const endIndex = startIndex + songsPerPage;
+    const pagesSongs = filteredSongs.slice(startIndex, endIndex);
+    
+    pagesSongs.forEach(song => {
+        const index = selectedSongs.findIndex(s => s.id === song.id);
+        if (index >= 0) {
+            selectedSongs.splice(index, 1);
+        }
+    });
+    
+    updateSelectedSongs();
+    renderSongResults();
+}
+
+function clearAllSelections() {
+    if (selectedSongs.length > 0 && !confirm('Remove all selected songs?')) return;
+    
+    selectedSongs = [];
+    updateSelectedSongs();
+    renderSongResults();
+}
+
+function clearFilters() {
+    document.getElementById('searchFilter').value = '';
+    document.getElementById('includeTagFilter').value = '';
+    document.getElementById('excludeTagFilter').value = '';
+    document.getElementById('sortFilter').value = 'name';
+    document.getElementById('energyFilter').value = '';
+    document.getElementById('valenceFilter').value = '';
+    applyFilters();
+}
+
+function previewSong(songId) {
+    window.open(`/api/songs/${songId}/preview?segment=0`, '_blank');
+}
+
+async function savePlaylist() {
+    const name = document.getElementById('playlistName').value.trim();
+    const description = document.getElementById('playlistDescription').value.trim();
+    
+    if (!name) {
+        alert('Please enter a playlist name');
+        document.getElementById('playlistName').focus();
+        return;
+    }
+    
+    if (selectedSongs.length === 0) {
+        alert('Please select at least one song');
+        return;
+    }
+    
+    try {
+        // Create the playlist
+        const playlistData = { name, description };
+        const response = await fetch('/api/playlists/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(playlistData)
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to create playlist');
+        }
+        
+        const playlist = await response.json();
+        
+        // Add songs to the playlist
+        for (const song of selectedSongs) {
+            await fetch(`/api/playlists/${playlist.id}/songs/${song.id}`, {
+                method: 'POST'
+            });
+        }
+        
+        alert(`Playlist "${name}" created successfully with ${selectedSongs.length} songs!`);
+        window.location.href = '/playlists';
+        
+    } catch (error) {
+        console.error('Error creating playlist:', error);
+        alert('Error creating playlist. Please try again.');
+    }
+}
+</script>
+{% endblock %}

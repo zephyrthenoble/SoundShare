@@ -1,0 +1,616 @@
+{% extends "base.html" %}
+
+{% block title %}Create Dynamic Playlist - SoundShare{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1>Create Dynamic Playlist</h1>
+                <p class="text-muted">Build a smart playlist based on tags and filters</p>
+            </div>
+            <a href="/playlists" class="btn btn-outline-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Playlists
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Playlist Form -->
+    <div class="col-lg-4">
+        <div class="card sticky-top" style="top: 1rem;">
+            <div class="card-header">
+                <h5 class="mb-0">Playlist Configuration</h5>
+            </div>
+            <div class="card-body">
+                <form id="playlistForm">
+                    <div class="mb-3">
+                        <label for="playlistName" class="form-label">Playlist Name *</label>
+                        <input type="text" class="form-control" id="playlistName" required>
+                    </div>
+                    <div class="mb-3">
+                        <label for="playlistDescription" class="form-label">Description</label>
+                        <textarea class="form-control" id="playlistDescription" rows="3"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>Include Tags</h6>
+                        <div id="includeTagsContainer" class="border rounded p-2 mb-2" style="min-height: 60px;">
+                            <div class="text-muted text-center py-2">Songs must have ALL these tags</div>
+                        </div>
+                        <select class="form-select form-select-sm" id="includeTagSelect" onchange="addIncludeTag()">
+                            <option value="">Add include tag...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>Exclude Tags</h6>
+                        <div id="excludeTagsContainer" class="border rounded p-2 mb-2" style="min-height: 60px;">
+                            <div class="text-muted text-center py-2">Songs must NOT have any of these tags</div>
+                        </div>
+                        <select class="form-select form-select-sm" id="excludeTagSelect" onchange="addExcludeTag()">
+                            <option value="">Add exclude tag...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>Audio Features</h6>
+                        <div class="row g-2">
+                            <div class="col-12">
+                                <label class="form-label form-label-sm">Energy Level</label>
+                                <select class="form-select form-select-sm" id="energyFilter" onchange="updatePreview()">
+                                    <option value="">Any Energy</option>
+                                    <option value="high">High Energy (0.7+)</option>
+                                    <option value="medium">Medium Energy (0.3-0.7)</option>
+                                    <option value="low">Low Energy (0.0-0.3)</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label form-label-sm">Mood (Valence)</label>
+                                <select class="form-select form-select-sm" id="valenceFilter" onchange="updatePreview()">
+                                    <option value="">Any Mood</option>
+                                    <option value="happy">Happy/Positive (0.7+)</option>
+                                    <option value="neutral">Neutral (0.3-0.7)</option>
+                                    <option value="sad">Sad/Negative (0.0-0.3)</option>
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label form-label-sm">Danceability</label>
+                                <select class="form-select form-select-sm" id="danceabilityFilter" onchange="updatePreview()">
+                                    <option value="">Any Danceability</option>
+                                    <option value="high">High Danceability (0.7+)</option>
+                                    <option value="medium">Medium Danceability (0.3-0.7)</option>
+                                    <option value="low">Low Danceability (0.0-0.3)</option>
+                                </select>
+                            </div>
+                        </div>
+                        <small class="text-muted">Filter songs based on audio analysis features</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6>Preview</h6>
+                        <div class="text-center">
+                            <span id="matchingCount" class="badge bg-primary fs-6">0 songs match</span>
+                        </div>
+                        <small class="text-muted d-block text-center mt-1">Songs matching current criteria</small>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="button" class="btn btn-primary" onclick="savePlaylist()" id="saveBtn">
+                            <i class="fas fa-save"></i> Create Dynamic Playlist
+                        </button>
+                        <button type="button" class="btn btn-outline-secondary" onclick="previewResults()">
+                            <i class="fas fa-search"></i> Preview Songs
+                        </button>
+                        <button type="button" class="btn btn-outline-danger" onclick="clearAllTags()">
+                            <i class="fas fa-trash"></i> Clear All Tags
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Preview Panel -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Song Preview</h5>
+                <small class="text-muted">Songs that will be included in this dynamic playlist</small>
+            </div>
+            <div class="card-body">
+                <div class="row mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label">Sort Preview By</label>
+                        <select class="form-select" id="sortFilter" onchange="updatePreview()">
+                            <option value="name">Name</option>
+                            <option value="artist">Artist</option>
+                            <option value="energy">Energy (High to Low)</option>
+                            <option value="valence">Valence (High to Low)</option>
+                            <option value="danceability">Danceability (High to Low)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Energy Filter</label>
+                        <select class="form-select" id="energyFilter" onchange="updatePreview()">
+                            <option value="">Any Energy</option>
+                            <option value="high">High Energy (70%+)</option>
+                            <option value="medium">Medium Energy (30-70%)</option>
+                            <option value="low">Low Energy (0-30%)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Mood Filter</label>
+                        <select class="form-select" id="valenceFilter" onchange="updatePreview()">
+                            <option value="">Any Mood</option>
+                            <option value="positive">Positive (70%+)</option>
+                            <option value="neutral">Neutral (30-70%)</option>
+                            <option value="melancholy">Melancholy (0-30%)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <span id="previewCount" class="text-muted">Configure tags to see preview</span>
+                    <div>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="clearPreviewFilters()">Clear Filters</button>
+                    </div>
+                </div>
+                
+                <div id="previewResults" class="row">
+                    <div class="col-12 text-center text-muted py-5">
+                        <i class="fas fa-tags fa-3x mb-3"></i>
+                        <h5>Add tags to see matching songs</h5>
+                        <p>Use the include/exclude tag selectors to define your dynamic playlist criteria</p>
+                    </div>
+                </div>
+                
+                <!-- Pagination -->
+                <nav aria-label="Preview pagination" class="mt-4">
+                    <ul class="pagination justify-content-center" id="previewPagination">
+                        <!-- Pagination will be generated here -->
+                    </ul>
+                </nav>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let allSongs = [];
+let allTags = [];
+let includeTags = [];
+let excludeTags = [];
+let previewSongs = [];
+
+// Preview pagination
+let currentPage = 1;
+let songsPerPage = 12;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadAllData();
+});
+
+async function loadAllData() {
+    try {
+        // Load songs with tags
+        const songsResponse = await fetch('/api/songs/');
+        allSongs = await songsResponse.json();
+        
+        // Load tags
+        const tagsResponse = await fetch('/api/tags/');
+        allTags = await tagsResponse.json();
+        
+        // Initialize selectors
+        populateTagSelectors();
+        updatePreview();
+        
+    } catch (error) {
+        console.error('Error loading data:', error);
+        alert('Error loading data. Please refresh the page.');
+    }
+}
+
+function populateTagSelectors() {
+    const includeSelect = document.getElementById('includeTagSelect');
+    const excludeSelect = document.getElementById('excludeTagSelect');
+    
+    // Clear and populate tag selectors
+    includeSelect.innerHTML = '<option value="">Add include tag...</option>';
+    excludeSelect.innerHTML = '<option value="">Add exclude tag...</option>';
+    
+    allTags.forEach(tag => {
+        // Only show tags not already selected
+        if (!includeTags.includes(tag.id) && !excludeTags.includes(tag.id)) {
+            const includeOption = document.createElement('option');
+            includeOption.value = tag.id;
+            includeOption.textContent = tag.name;
+            includeSelect.appendChild(includeOption);
+            
+            const excludeOption = document.createElement('option');
+            excludeOption.value = tag.id;
+            excludeOption.textContent = tag.name;
+            excludeSelect.appendChild(excludeOption);
+        }
+    });
+}
+
+function addIncludeTag() {
+    const select = document.getElementById('includeTagSelect');
+    const tagId = parseInt(select.value);
+    
+    if (tagId && !includeTags.includes(tagId)) {
+        includeTags.push(tagId);
+        select.value = '';
+        renderTags();
+        populateTagSelectors();
+        updatePreview();
+    }
+}
+
+function addExcludeTag() {
+    const select = document.getElementById('excludeTagSelect');
+    const tagId = parseInt(select.value);
+    
+    if (tagId && !excludeTags.includes(tagId)) {
+        excludeTags.push(tagId);
+        select.value = '';
+        renderTags();
+        populateTagSelectors();
+        updatePreview();
+    }
+}
+
+function removeIncludeTag(tagId) {
+    includeTags = includeTags.filter(id => id !== tagId);
+    renderTags();
+    populateTagSelectors();
+    updatePreview();
+}
+
+function removeExcludeTag(tagId) {
+    excludeTags = excludeTags.filter(id => id !== tagId);
+    renderTags();
+    populateTagSelectors();
+    updatePreview();
+}
+
+function renderTags() {
+    // Render include tags
+    const includeContainer = document.getElementById('includeTagsContainer');
+    if (includeTags.length === 0) {
+        includeContainer.innerHTML = '<div class="text-muted text-center py-2">Songs must have ALL these tags</div>';
+    } else {
+        includeContainer.innerHTML = includeTags.map(tagId => {
+            const tag = allTags.find(t => t.id === tagId);
+            return tag ? `
+                <span class="badge bg-success me-1 mb-1">
+                    ${tag.name} 
+                    <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.6em;" onclick="removeIncludeTag(${tagId})"></button>
+                </span>
+            ` : '';
+        }).join('');
+    }
+    
+    // Render exclude tags
+    const excludeContainer = document.getElementById('excludeTagsContainer');
+    if (excludeTags.length === 0) {
+        excludeContainer.innerHTML = '<div class="text-muted text-center py-2">Songs must NOT have any of these tags</div>';
+    } else {
+        excludeContainer.innerHTML = excludeTags.map(tagId => {
+            const tag = allTags.find(t => t.id === tagId);
+            return tag ? `
+                <span class="badge bg-danger me-1 mb-1">
+                    ${tag.name} 
+                    <button type="button" class="btn-close btn-close-white ms-1" style="font-size: 0.6em;" onclick="removeExcludeTag(${tagId})"></button>
+                </span>
+            ` : '';
+        }).join('');
+    }
+}
+
+function updatePreview() {
+    // Calculate matching songs based on current criteria
+    const matchingSongs = allSongs.filter(song => {
+        const songTagIds = song.tags ? song.tags.map(tag => tag.id) : [];
+        
+        // Check include tags (song must have ALL include tags)
+        if (includeTags.length > 0) {
+            const hasAllIncludeTags = includeTags.every(tagId => songTagIds.includes(tagId));
+            if (!hasAllIncludeTags) return false;
+        }
+        
+        // Check exclude tags (song must have NONE of the exclude tags)
+        if (excludeTags.length > 0) {
+            const hasAnyExcludeTag = excludeTags.some(tagId => songTagIds.includes(tagId));
+            if (hasAnyExcludeTag) return false;
+        }
+        
+        return true;
+    });
+    
+    // Apply additional filters for preview
+    const sortBy = document.getElementById('sortFilter').value;
+    const energyRange = document.getElementById('energyFilter').value;
+    const valenceRange = document.getElementById('valenceFilter').value;
+    
+    previewSongs = matchingSongs.filter(song => {
+        // Energy filter
+        if (energyRange) {
+            const energy = song.energy || 0;
+            switch(energyRange) {
+                case 'high': if (energy < 0.7) return false; break;
+                case 'medium': if (energy < 0.3 || energy >= 0.7) return false; break;
+                case 'low': if (energy >= 0.3) return false; break;
+            }
+        }
+        
+        // Valence filter
+        if (valenceRange) {
+            const valence = song.valence || 0;
+            switch(valenceRange) {
+                case 'positive': if (valence < 0.7) return false; break;
+                case 'neutral': if (valence < 0.3 || valence >= 0.7) return false; break;
+                case 'melancholy': if (valence >= 0.3) return false; break;
+            }
+        }
+        
+        return true;
+    });
+    
+    // Sort songs
+    previewSongs.sort((a, b) => {
+        switch (sortBy) {
+            case 'name':
+                return (a.display_name || '').localeCompare(b.display_name || '');
+            case 'artist':
+                return (a.artist || '').localeCompare(b.artist || '');
+            case 'energy':
+                return (b.energy || 0) - (a.energy || 0);
+            case 'valence':
+                return (b.valence || 0) - (a.valence || 0);
+            case 'danceability':
+                return (b.danceability || 0) - (a.danceability || 0);
+            default:
+                return 0;
+        }
+    });
+    
+    // Update counts
+    document.getElementById('matchingCount').textContent = `${matchingSongs.length} songs match`;
+    document.getElementById('previewCount').textContent = `${previewSongs.length} songs (${matchingSongs.length} total matches)`;
+    
+    currentPage = 1;
+    renderPreviewResults();
+    renderPreviewPagination();
+}
+
+function renderPreviewResults() {
+    const container = document.getElementById('previewResults');
+    
+    if (includeTags.length === 0 && excludeTags.length === 0) {
+        container.innerHTML = `
+            <div class="col-12 text-center text-muted py-5">
+                <i class="fas fa-tags fa-3x mb-3"></i>
+                <h5>Add tags to see matching songs</h5>
+                <p>Use the include/exclude tag selectors to define your dynamic playlist criteria</p>
+            </div>
+        `;
+        return;
+    }
+    
+    if (previewSongs.length === 0) {
+        container.innerHTML = `
+            <div class="col-12 text-center text-muted py-5">
+                <i class="fas fa-search fa-3x mb-3"></i>
+                <h5>No songs match current criteria</h5>
+                <p>Try adjusting your tag selections or preview filters</p>
+            </div>
+        `;
+        return;
+    }
+    
+    const startIndex = (currentPage - 1) * songsPerPage;
+    const endIndex = startIndex + songsPerPage;
+    const pagesSongs = previewSongs.slice(startIndex, endIndex);
+    
+    container.innerHTML = '';
+    
+    pagesSongs.forEach(song => {
+        const col = document.createElement('div');
+        col.className = 'col-md-6 col-lg-4 mb-3';
+        
+        col.innerHTML = `
+            <div class="card h-100">
+                <div class="card-body">
+                    <h6 class="card-title mb-1">${song.display_name}</h6>
+                    <p class="card-text">
+                        <small class="text-muted">${song.artist || 'Unknown Artist'}</small><br>
+                        <small class="text-info">
+                            E: ${(song.energy * 100).toFixed(0)}% | 
+                            V: ${(song.valence * 100).toFixed(0)}% | 
+                            D: ${(song.danceability * 100).toFixed(0)}%
+                        </small>
+                    </p>
+                    ${song.tags && song.tags.length > 0 ? `
+                        <div class="mb-2">
+                            ${song.tags.map(tag => {
+                                let badgeClass = 'bg-secondary';
+                                if (includeTags.includes(tag.id)) badgeClass = 'bg-success';
+                                if (excludeTags.includes(tag.id)) badgeClass = 'bg-danger';
+                                return `<span class="badge ${badgeClass} me-1 mb-1">${tag.name}</span>`;
+                            }).join('')}
+                        </div>
+                    ` : ''}
+                    <div class="d-grid">
+                        <button class="btn btn-sm btn-outline-primary" onclick="previewSong(${song.id})">
+                            <i class="fas fa-play"></i> Preview
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        container.appendChild(col);
+    });
+}
+
+function renderPreviewPagination() {
+    const totalPages = Math.ceil(previewSongs.length / songsPerPage);
+    const pagination = document.getElementById('previewPagination');
+    pagination.innerHTML = '';
+    
+    if (totalPages <= 1) return;
+    
+    // Previous button
+    const prevLi = document.createElement('li');
+    prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+    prevLi.innerHTML = `<a class="page-link" href="#" onclick="changePreviewPage(${currentPage - 1})">Previous</a>`;
+    pagination.appendChild(prevLi);
+    
+    // Page numbers (show max 5 pages around current)
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, currentPage + 2);
+    
+    for (let i = startPage; i <= endPage; i++) {
+        const li = document.createElement('li');
+        li.className = `page-item ${i === currentPage ? 'active' : ''}`;
+        li.innerHTML = `<a class="page-link" href="#" onclick="changePreviewPage(${i})">${i}</a>`;
+        pagination.appendChild(li);
+    }
+    
+    // Next button
+    const nextLi = document.createElement('li');
+    nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+    nextLi.innerHTML = `<a class="page-link" href="#" onclick="changePreviewPage(${currentPage + 1})">Next</a>`;
+    pagination.appendChild(nextLi);
+}
+
+function changePreviewPage(page) {
+    const totalPages = Math.ceil(previewSongs.length / songsPerPage);
+    if (page >= 1 && page <= totalPages) {
+        currentPage = page;
+        renderPreviewResults();
+        renderPreviewPagination();
+        // Scroll to top of results
+        document.getElementById('previewResults').scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+function clearPreviewFilters() {
+    document.getElementById('sortFilter').value = 'name';
+    document.getElementById('energyFilter').value = '';
+    document.getElementById('valenceFilter').value = '';
+    updatePreview();
+}
+
+function clearAllTags() {
+    if ((includeTags.length > 0 || excludeTags.length > 0) && !confirm('Clear all selected tags?')) {
+        return;
+    }
+    
+    includeTags = [];
+    excludeTags = [];
+    renderTags();
+    populateTagSelectors();
+    updatePreview();
+}
+
+function previewResults() {
+    updatePreview();
+    document.getElementById('previewResults').scrollIntoView({ behavior: 'smooth' });
+}
+
+function previewSong(songId) {
+    window.open(`/api/songs/${songId}/preview?segment=0`, '_blank');
+}
+
+async function savePlaylist() {
+    const name = document.getElementById('playlistName').value.trim();
+    const description = document.getElementById('playlistDescription').value.trim();
+    
+    if (!name) {
+        alert('Please enter a playlist name');
+        document.getElementById('playlistName').focus();
+        return;
+    }
+    
+    if (includeTags.length === 0 && excludeTags.length === 0) {
+        alert('Please select at least one include or exclude tag');
+        return;
+    }
+    
+    try {
+        // Get audio feature filter values
+        const energyFilter = document.getElementById('energyFilter').value;
+        const valenceFilter = document.getElementById('valenceFilter').value;
+        const danceabilityFilter = document.getElementById('danceabilityFilter').value;
+        
+        // Convert filter values to min/max ranges
+        let energyMin = null, energyMax = null;
+        let valenceMin = null, valenceMax = null;
+        let danceabilityMin = null, danceabilityMax = null;
+        
+        if (energyFilter === 'high') { energyMin = 0.7; energyMax = 1.0; }
+        else if (energyFilter === 'medium') { energyMin = 0.3; energyMax = 0.7; }
+        else if (energyFilter === 'low') { energyMin = 0.0; energyMax = 0.3; }
+        
+        if (valenceFilter === 'happy') { valenceMin = 0.7; valenceMax = 1.0; }
+        else if (valenceFilter === 'neutral') { valenceMin = 0.3; valenceMax = 0.7; }
+        else if (valenceFilter === 'sad') { valenceMin = 0.0; valenceMax = 0.3; }
+        
+        if (danceabilityFilter === 'high') { danceabilityMin = 0.7; danceabilityMax = 1.0; }
+        else if (danceabilityFilter === 'medium') { danceabilityMin = 0.3; danceabilityMax = 0.7; }
+        else if (danceabilityFilter === 'low') { danceabilityMin = 0.0; danceabilityMax = 0.3; }
+        
+        const playlistData = {
+            name,
+            description,
+            include_tag_ids: includeTags,
+            exclude_tag_ids: excludeTags,
+            energy_min: energyMin,
+            energy_max: energyMax,
+            valence_min: valenceMin,
+            valence_max: valenceMax,
+            danceability_min: danceabilityMin,
+            danceability_max: danceabilityMax
+        };
+        
+        const response = await fetch('/api/dynamic-playlists/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(playlistData)
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to create dynamic playlist');
+        }
+        
+        const matchingCount = allSongs.filter(song => {
+            const songTagIds = song.tags ? song.tags.map(tag => tag.id) : [];
+            
+            if (includeTags.length > 0) {
+                const hasAllIncludeTags = includeTags.every(tagId => songTagIds.includes(tagId));
+                if (!hasAllIncludeTags) return false;
+            }
+            
+            if (excludeTags.length > 0) {
+                const hasAnyExcludeTag = excludeTags.some(tagId => songTagIds.includes(tagId));
+                if (hasAnyExcludeTag) return false;
+            }
+            
+            return true;
+        }).length;
+        
+        alert(`Dynamic playlist "${name}" created successfully!\nCurrently matches ${matchingCount} songs.`);
+        window.location.href = '/playlists';
+        
+    } catch (error) {
+        console.error('Error creating dynamic playlist:', error);
+        alert('Error creating dynamic playlist. Please try again.');
+    }
+}
+</script>
+{% endblock %}
