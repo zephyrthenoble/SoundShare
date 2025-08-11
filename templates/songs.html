@@ -166,12 +166,12 @@
                             <th width="50">
                                 <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
                             </th>
-                            <th>Name</th>
-                            <th>Folder</th>
-                            <th>Album</th>
-                            <th>Track #</th>
-                            <th>Duration</th>
-                            <th>Mood</th>
+                            <th width="250">Name</th>
+                            <th width="140">Folder</th>
+                            <th width="160">Album</th>
+                            <th width="80">Track #</th>
+                            <th width="80">Duration</th>
+                            <th width="180">Mood</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -682,10 +682,26 @@ function renderSongsTable() {
             return `${mins}:${secs.toString().padStart(2, '0')}`;
         };
         
-        // Mood indicators
-        const energy = (song.energy * 100).toFixed(0);
-        const valence = (song.valence * 100).toFixed(0);
-        const danceability = (song.danceability * 100).toFixed(0);
+        // COMMENTED OUT: Complex mood calculations for debugging
+        const energy = song.energy !== null && song.energy !== undefined ? Math.max((song.energy * 100).toFixed(0), 2) : '0';
+        const valence = song.valence !== null && song.valence !== undefined ? Math.max((song.valence * 100).toFixed(0), 2) : '0';
+        const danceability = song.danceability !== null && song.danceability !== undefined ? Math.max((song.danceability * 100).toFixed(0), 2) : '0';
+        
+        // HARDCODED VALUES FOR TESTING
+        // const energy = '75';
+        // const valence = '60'; 
+        // const danceability = '85';
+        
+        // Enhanced debug logging for first few songs
+        if (filteredSongs.indexOf(song) < 3) {
+            console.log(`Song ${filteredSongs.indexOf(song) + 1} (${song.display_name}):`, {
+                rawValues: { energy: song.energy, valence: song.valence, danceability: song.danceability },
+                calculatedValues: { energy, valence, danceability },
+                hasData: (song.energy !== null && song.energy !== undefined) || 
+                        (song.valence !== null && song.valence !== undefined) || 
+                        (song.danceability !== null && song.danceability !== undefined)
+            });
+        }
         
         const isSelected = selectedSongs.has(song.id);
         
@@ -694,15 +710,24 @@ function renderSongsTable() {
                 <input type="checkbox" class="song-checkbox" data-song-id="${song.id}" 
                        ${isSelected ? 'checked' : ''} onchange="toggleSongSelection(${song.id})">
             </td>
-            <td>${song.display_name}</td>
-            <td><small class="text-muted">${getFolder(song.file_path)}</small></td>
-            <td>${song.album || ''}</td>
-            <td>${song.track_number || ''}</td>
+            <td class="song-name-cell" title="${song.display_name}" style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.display_name}</td>
+            <td class="song-folder-cell" title="${getFolder(song.file_path)}" style="max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><small class="text-muted">${getFolder(song.file_path)}</small></td>
+            <td class="song-album-cell" title="${song.album || ''}" style="max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.album || ''}</td>
+            <td class="song-track-cell">${song.track_number || ''}</td>
             <td><small>${formatDuration(song.duration)}</small></td>
-            <td>
-                <small>
-                    E: ${energy}% | V: ${valence}% | D: ${danceability}%
-                </small>
+            <td style="padding: 4px; height: 40px; vertical-align: middle;">
+                <!-- HARDCODED TEST BARS FOR DEBUGGING -->
+                <div class="mood-bars" title="Test: Energy: ${energy}% | Valence: ${valence}% | Danceability: ${danceability}%" style="height: 32px !important; min-height: 32px !important; display: flex !important; flex-direction: column !important;">
+                    <div class="mood-bar-container" style="height: 8px !important; min-height: 8px !important; background-color: #e9ecef ; margin-bottom: 2px ;">
+                        <div class="energy-bar" style="width: ${energy}%; height: 8px !important; min-height: 8px !important;" title="Test Energy: ${energy}%"></div>
+                    </div>
+                    <div class="mood-bar-container" style="height: 8px !important; min-height: 8px !important; background-color: #e9ecef ; margin-bottom: 2px ;">
+                        <div class="valence-bar" style="width: ${valence}%; height: 8px !important; min-height: 8px !important;" title="Test Valence: ${valence}%"></div>
+                    </div>
+                    <div class="mood-bar-container" style="height: 8px !important; min-height: 8px !important; background-color: #e9ecef ;">
+                        <div class="danceability-bar" style="width: ${danceability}%; height: 8px !important; min-height: 8px !important;" title="Test Danceability: ${danceability}%"></div>
+                    </div>
+                </div>
             </td>
         `;
         
@@ -725,13 +750,14 @@ function populateFilterDropdowns() {
     const artists = [...new Set(songs.map(song => song.artist).filter(Boolean))].sort();
     const albums = [...new Set(songs.map(song => song.album).filter(Boolean))].sort();
     
-    // Extract folder paths from filenames
+    // Extract folder paths from file_path using the same logic as getFolder function
     const folders = [...new Set(songs.map(song => {
-        if (song.filename && song.filename.includes('/')) {
-            // Get directory path by removing the filename
-            const parts = song.filename.split('/');
-            parts.pop(); // Remove the actual filename
-            return parts.join('/');
+        if (song.file_path) {
+            const parts = song.file_path.split('/');
+            if (parts.length > 1) {
+                parts.pop(); // Remove filename
+                return parts[parts.length - 1]; // Return last folder name
+            }
         }
         return null;
     }).filter(Boolean))].sort();
@@ -752,8 +778,7 @@ function populateFilterDropdowns() {
     
     folderSelect.innerHTML = '<option value="">All Folders</option>';
     folders.forEach(folder => {
-        const folderName = folder.split('/').pop() || folder; // Show just the folder name
-        folderSelect.innerHTML += `<option value="${folder}" title="${folder}">${folderName}</option>`;
+        folderSelect.innerHTML += `<option value="${folder}">${folder}</option>`;
     });
 }
 
@@ -798,8 +823,18 @@ function applyFilters() {
         const matchesArtist = !selectedArtist || song.artist === selectedArtist;
         const matchesAlbum = !selectedAlbum || song.album === selectedAlbum;
         
-        // Check if song is in the selected folder
-        const matchesFolder = !selectedFolder || (song.filename && song.filename.startsWith(selectedFolder + '/'));
+        // Check if song is in the selected folder using the same logic as getFolder
+        const matchesFolder = !selectedFolder || (() => {
+            if (song.file_path) {
+                const parts = song.file_path.split('/');
+                if (parts.length > 1) {
+                    parts.pop(); // Remove filename
+                    const folderName = parts[parts.length - 1]; // Get last folder name
+                    return folderName === selectedFolder;
+                }
+            }
+            return false;
+        })();
         
         // Energy filter
         let matchesEnergy = true;
@@ -1475,7 +1510,7 @@ async function previewSong(songId, rowElement) {
                                 <div class="d-flex align-items-center mb-2">
                                     <strong class="me-2 small">Tags:</strong>
                                     <button class="btn btn-sm btn-outline-success" onclick="manageTags(${songId}); event.stopPropagation();" title="Add/Remove Tags">
-                                        <i class="fas fa-plus"></i>✎
+                                        <i class="fas fa-plus"></i>
                                     </button>
                                 </div>
                                 <div class="d-flex flex-wrap gap-1">

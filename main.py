@@ -29,10 +29,6 @@ app.include_router(dynamic_playlists.router, prefix="/api/dynamic-playlists", ta
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request})
 
-@app.get("/playing", response_class=HTMLResponse)
-async def playing_page(request: Request):
-    return templates.TemplateResponse("playing.html", {"request": request})
-
 @app.get("/playlists")
 async def playlists_page(request: Request):
     return templates.TemplateResponse("playlists_combined.html", {"request": request})

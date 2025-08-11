@@ -109,18 +109,110 @@ body {
     transition: width 0.3s ease;
 }
 
-/* Dark mode support (for future) */
-@media (prefers-color-scheme: dark) {
-
+/* Song table text truncation - Method 1: Force table layout */
+#songsTable {
+    table-layout: fixed !important;
+    width: 100% !important;
 }
 
-/* In your custom CSS or Sass file */
-[data-bs-theme="dark"] {
-  --bs-body-color: #f8f9fa; /* A light off-white color */
-  --bs-body-bg: #343a40; /* Dark background color */
-  --bs-border-color: #454d55; /* Dark border color */
-  --bs-table-striped-bg: #495057; /* Dark striped table background */
-  --bs-table-striped-color: #f8f9fa; /* Light text color for striped table */
-  --bs-table-active-color: #f8f9fa; /* Light text color for active table rows */
-  --bs-table-hover-color: #f8f9fa; /* Light text color for hover table rows */
+#songsTable td {
+    vertical-align: middle;
+    height: 40px;
+    min-height: 40px;
+}
+
+#songsTable td.song-name-cell {
+    max-width: 250px !important;
+    width: 250px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+#songsTable td.song-folder-cell {
+    max-width: 140px !important;
+    width: 140px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+#songsTable td.song-album-cell {
+    max-width: 160px !important;
+    width: 160px !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+#songsTable td.song-track-cell {
+    width: 80px !important;
+    text-align: center;
+}
+
+#songsTable td {
+    vertical-align: middle;
+}
+
+/* Mood bar visualization */
+.mood-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    width: 100%;
+    height: 100%;
+    min-height: 30px;
+    padding: 2px 0;
+    justify-content: space-around;
+}
+
+.mood-bar-container {
+    /* height: 8px !important; */   
+    min-height: 8px !important;
+    /*
+    background-color: #e9ecef !important;
+    border-radius: 4px;
+    overflow: hidden !important;
+    position: relative !important;
+    flex: 1;
+    max-height: 10px;
+    margin-bottom: 2px !important;
+    */
+    opacity: 0.2 ;
+}
+
+.mood-bar {
+    height: 100% ;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    min-width: 3px !important;
+    opacity: 1 !important;
+    display: block ;
+    position: relative ;
+}
+
+.mood-bar:hover {
+    opacity: 1;
+}
+
+/*
+.mood-bars:hover .mood-bar-container {
+    background-color: #dee2e6;
+}
+*/
+.mood-bar {
+ background: #e83e8c;
+}
+.energy-bar {
+    background: linear-gradient(90deg, #28a745 0%, #20c997 50%, #17a2b8 100%) !important;
+    background-color: #007bff;
+    color: #dc3545;
+}
+
+.valence-bar {
+    background: linear-gradient(90deg, #dc3545 0%, #ffc107 50%, #28a745 100%) !important;
+}
+
+.danceability-bar {
+    background: linear-gradient(90deg, #6c757d 0%, #fd7e14 50%, #e83e8c 100%) !important;
 }
