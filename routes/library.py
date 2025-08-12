@@ -266,13 +266,14 @@ async def remove_scan_directories(request: RemoveScanDirectoriesRequest, db: Ses
 @router.post("/scan-directories")
 async def scan_directories(request: ScanDirectoriesRequest, db: Session = Depends(get_db)):
     """Scan directories for new music files"""
-    audio_extensions = {'.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.wma'}
+    audio_extensions = AUDIO_EXTENSIONS
     found = 0
     added = 0
     errors = 0
     
     for dir_path in request.paths:
         try:
+            print(f"Scanning directory: {dir_path}")
             path = Path(dir_path)
             if not path.exists() or not path.is_dir():
                 errors += 1
@@ -280,6 +281,7 @@ async def scan_directories(request: ScanDirectoriesRequest, db: Session = Depend
                 
             # Recursively find audio files
             for file_path in path.rglob('*'):
+                print(f"Found file: {file_path}")
                 if file_path.suffix.lower() in audio_extensions:
                     found += 1
                     
@@ -288,10 +290,12 @@ async def scan_directories(request: ScanDirectoriesRequest, db: Session = Depend
                     if not existing:
                         try:
                             song = Song(
+                                filename=file_path.name,
                                 file_path=str(file_path),
                                 display_name=file_path.stem,
                                 manually_added=False
                             )
+                            print(song)
                             db.add(song)
                             added += 1
                         except Exception:
