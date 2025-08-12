@@ -1,13 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
 from sqlalchemy.orm import Session
 from pathlib import Path
 from pydantic import BaseModel
 from typing import List
-import os
-import glob
-from datetime import datetime
+from datetime import datetime, UTC
+
 from database.database import get_db
 from database.models import Song, ScannedDirectory
 from utils.config import get_library_path
@@ -25,6 +23,9 @@ class AddScanDirectoriesRequest(BaseModel):
 
 class RemoveScanDirectoriesRequest(BaseModel):
     paths: List[str]
+
+class RemoveSongRequest(BaseModel):
+    id: int
 
 class ScanDirectoriesRequest(BaseModel):
     paths: List[str]
@@ -118,8 +119,7 @@ async def browse_library(path: str = "", db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     
-    # Audio file extensions
-    audio_extensions = AUDIO_EXTENSIONS
+
 
     items = []
     try:
@@ -139,7 +139,7 @@ async def browse_library(path: str = "", db: Session = Depends(get_db)):
                         "full_path": full_path,
                         "already_added": full_path in existing_dirs
                     })
-                elif item.is_file() and item.suffix.lower() in audio_extensions:
+                elif item.is_file() and item.suffix.lower() in AUDIO_EXTENSIONS:
                     items.append({
                         "type": "file", 
                         "name": item.name,
@@ -180,7 +180,7 @@ async def browse_library(path: str = "", db: Session = Depends(get_db)):
 
 
 # New API endpoints
-@router.post("/add-song")
+@router.post("/song/add", deprecated=True)
 async def add_song(request: AddSongRequest, db: Session = Depends(get_db)):
     """Add a single song to the database"""
     song_path = Path(request.path)
@@ -213,7 +213,7 @@ async def add_song(request: AddSongRequest, db: Session = Depends(get_db)):
     return {"message": "Song added successfully", "id": song.id}
 
 
-@router.post("/add-scan-directories")
+@router.post("/directory/add")
 async def add_scan_directories(request: AddScanDirectoriesRequest, db: Session = Depends(get_db)):
     """Add directories to scan list"""
     library_root = Path(get_library_path())
@@ -248,7 +248,7 @@ async def add_scan_directories(request: AddScanDirectoriesRequest, db: Session =
     return {"message": f"Added {len(added_dirs)} directories", "added": added_dirs}
 
 
-@router.post("/remove-scan-directories")
+@router.post("/directory/remove")
 async def remove_scan_directories(request: RemoveScanDirectoriesRequest, db: Session = Depends(get_db)):
     """Remove directories from scan list (for undo functionality)"""
     removed_count = 0
@@ -262,16 +262,31 @@ async def remove_scan_directories(request: RemoveScanDirectoriesRequest, db: Ses
     db.commit()
     return {"message": f"Removed {removed_count} directories"}
 
-
-@router.post("/scan-directories")
+@router.post("/scan")
 async def scan_directories(request: ScanDirectoriesRequest, db: Session = Depends(get_db)):
+    return await scan_local_directories(request.paths, db)
+
+@router.post("/scan/all")
+async def scan_all_directories(db: Session = Depends(get_db)):
+    """Scan all directories for new music files"""
+    # Get all scanned directories
+    scanned_dirs = db.query(ScannedDirectory).all()
+    if not scanned_dirs:
+        raise HTTPException(status_code=404, detail="No directories to scan")
+
+    paths = [x.directory_path for x in scanned_dirs]
+    
+
+    return await scan_local_directories(paths, db)
+
+async def scan_local_directories(paths: List[str], db: Session=Depends(get_db)):
     """Scan directories for new music files"""
-    audio_extensions = AUDIO_EXTENSIONS
+
     found = 0
     added = 0
     errors = 0
     
-    for dir_path in request.paths:
+    for dir_path in paths:
         try:
             print(f"Scanning directory: {dir_path}")
             path = Path(dir_path)
@@ -282,7 +297,7 @@ async def scan_directories(request: ScanDirectoriesRequest, db: Session = Depend
             # Recursively find audio files
             for file_path in path.rglob('*'):
                 print(f"Found file: {file_path}")
-                if file_path.suffix.lower() in audio_extensions:
+                if file_path.suffix.lower() in AUDIO_EXTENSIONS:
                     found += 1
                     
                     # Check if already exists
@@ -305,11 +320,11 @@ async def scan_directories(request: ScanDirectoriesRequest, db: Session = Depend
             errors += 1
     
     # Update last_scanned timestamp for the directories
-    for dir_path in request.paths:
+    for dir_path in paths:
         scan_dir = db.query(ScannedDirectory).filter(ScannedDirectory.directory_path == dir_path).first()
         if scan_dir:
-            from datetime import datetime
-            scan_dir.last_scanned = datetime.utcnow()
-    
+
+            scan_dir.last_scanned = datetime.now(tz=UTC)
+
     db.commit()
     return {"found": found, "added": added, "errors": errors}

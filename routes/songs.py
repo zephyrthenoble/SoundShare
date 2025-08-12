@@ -13,6 +13,7 @@ import tempfile
 from database.database import get_db
 from database.models import Song, Tag, ScannedDirectory
 from services.audio_analyzer import AudioAnalyzer
+from utils.constants import AUDIO_EXTENSIONS
 
 class BatchTagRequest(BaseModel):
     song_ids: List[int]
@@ -80,7 +81,7 @@ async def get_song(song_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Song not found")
     return song
 
-@router.post("/add-file")
+@router.post("/add")
 async def add_song_file(
     file_path: str,
     display_name: Optional[str] = None,
@@ -92,8 +93,9 @@ async def add_song_file(
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="File not found")
     
+
     # Check if it's an audio file
-    valid_extensions = {'.mp3', '.wav', '.flac', '.m4a', '.ogg', '.wma'}
+    valid_extensions = AUDIO_EXTENSIONS
     file_ext = Path(file_path).suffix.lower()
     if file_ext not in valid_extensions:
         raise HTTPException(status_code=400, detail="Invalid audio file format")

@@ -47,7 +47,7 @@ class NotificationSystem {
             type: 'info',
             title: '',
             message: '',
-            duration: 0,
+            duration: 5,
             dismissible: true,
             action: null,
             ...options

@@ -123,15 +123,15 @@ function bindPageEvents() {
         }
     });
     
-    // Undo button
-    //document.getElementById('undoBtn').addEventListener('click', () => {
-    //    undoAddDirectories();
-    //});
+
+    document.getElementById('undoBtn').addEventListener('click', () => {
+        undoAddDirectories();
+    });
 }
 
 async function addDirectories(directoryPaths) {
     try {
-        const response = await fetch('/api/library/add-scan-directories', {
+        const response = await fetch('/api/library/directory/add', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -141,7 +141,8 @@ async function addDirectories(directoryPaths) {
         
         if (response.ok) {
             addedDirectories = directoryPaths;
-            showUndoToast(directoryPaths.length);
+            startDirectoryScan();
+
             
             // Clear selections
             pageBrowser.selectedItems.clear();
@@ -158,21 +159,11 @@ async function addDirectories(directoryPaths) {
     }
 }
 
-function showUndoToast(count) {
-    const message = `${count} director${count === 1 ? 'y' : 'ies'} added to scan list.`;
-    
-    notificationSystem.undo(
-        'Directories Added',
-        message,
-        undoAddDirectories,
-        startDirectoryScan,
-        5
-    );
-}
+
 
 async function undoAddDirectories() {
     try {
-        const response = await fetch('/api/library/remove-scan-directories', {
+        const response = await fetch('/api/library/directory/remove', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -200,8 +191,13 @@ async function startDirectoryScan() {
     const currentScanFile = document.getElementById('currentScanFile');
     const closeScanBtn = document.getElementById('closeScanBtn');
     
+    // Add event listener for close button
+    closeScanBtn.onclick = function() {
+        scanModal.hide();
+    };
+    
     try {
-        const response = await fetch('/api/library/scan-directories', {
+        const response = await fetch('/api/library/scan', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

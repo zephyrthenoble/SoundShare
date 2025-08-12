@@ -1122,7 +1122,7 @@ async function addSingleSong() {
         }
         
         try {
-            const response = await fetch('/api/songs/add-file', {
+            const response = await fetch('/api/songs/add', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

@@ -11,7 +11,7 @@
                 <a href="/library" class="btn btn-outline-secondary me-3">
                     <i class="fas fa-arrow-left"></i> Back to Library
                 </a>
-                <h2 class="mb-0">Add Songs</h2>
+                <h2 class="mb-0">Add {% if type == "songs" %}Songs{% else %}Directories{% endif %}</h2>
             </div>
             <p class="text-muted mt-2">Browse and select individual songs to add to your library.</p>
         </div>
@@ -133,14 +133,8 @@ async function addSongs(songPaths) {
     const currentFile = document.getElementById('currentFile');
     const closeBtn = document.getElementById('closeProgressBtn');
     
-    // Add event listener for close button
-    closeBtn.onclick = function() {
-        progressModal.hide();
-    };
-
     let added = 0, errors = 0;
     const total = songPaths.length;
-    successfully_added = [];
     
     for (let i = 0; i < songPaths.length; i++) {
         const songPath = songPaths[i];
@@ -150,7 +144,7 @@ async function addSongs(songPaths) {
         processingCount.textContent = i + 1;
         
         try {
-            const response = await fetch('/api/songs/add', {
+            const response = await fetch('/api/library/song/add', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -161,7 +155,6 @@ async function addSongs(songPaths) {
             if (response.ok) {
                 added++;
                 addedCount.textContent = added;
-                successfully_added.push(songPath);
             } else {
                 errors++;
                 errorCount.textContent = errors;
@@ -182,8 +175,7 @@ async function addSongs(songPaths) {
     
     // Show completion notification
     if (added > 0) {
-        //notificationSystem.success('Songs Added', `Successfully added ${added} song${added === 1 ? '' : 's'} to the library.`);
-        //notificationSystem.undo('Songs Added', `Successfully added ${added} song${added === 1 ? '' : 's'} to the library.`, undoAddSongs);
+        notificationSystem.success('Songs Added', `Successfully added ${added} song${added === 1 ? '' : 's'} to the library.`);
     }
     if (errors > 0) {
         notificationSystem.warning('Some Errors', `${errors} song${errors === 1 ? '' : 's'} could not be added. Check the progress details.`);
