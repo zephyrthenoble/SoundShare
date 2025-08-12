@@ -15,6 +15,13 @@ from database.models import Song, Tag, ScannedDirectory
 from services.audio_analyzer import AudioAnalyzer
 from utils.constants import AUDIO_EXTENSIONS
 
+
+class AddSongsRequest(BaseModel):
+    songs: List[str]
+
+class RemoveSongsRequest(BaseModel):
+    paths: List[str]
+
 class BatchTagRequest(BaseModel):
     song_ids: List[int]
     tag_ids: List[int]
@@ -83,98 +90,139 @@ async def get_song(song_id: int, db: Session = Depends(get_db)):
 
 @router.post("/add")
 async def add_song_file(
-    file_path: str,
-    display_name: Optional[str] = None,
+    songs: AddSongsRequest,
     db: Session = Depends(get_db)
 ):
-    """Add a song by referencing an existing file path."""
-    
-    # Check if file exists
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="File not found")
-    
+    """
+    Add a song by referencing an existing file path.
+    """
+    found = []
+    added = []
+    errors = []
 
-    # Check if it's an audio file
-    valid_extensions = AUDIO_EXTENSIONS
-    file_ext = Path(file_path).suffix.lower()
-    if file_ext not in valid_extensions:
-        raise HTTPException(status_code=400, detail="Invalid audio file format")
-    
-    # Check if song already exists
-    existing_song = db.query(Song).filter(Song.file_path == file_path).first()
-    if existing_song:
-        raise HTTPException(status_code=409, detail="Song already exists in database")
-    
-    # Check file size - reject zero-length files
-    file_info = Path(file_path)
-    file_size = file_info.stat().st_size
-    if file_size == 0:
-        raise HTTPException(status_code=400, detail=f"File '{file_path}' is empty (0 bytes) and cannot be added")
-    
-    # Analyze audio and extract metadata
-    try:
-        analysis = audio_analyzer.analyze_song(file_path)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to analyze audio: {str(e)}")
-    
-    # Get filename (file_info already retrieved above for size check)
-    filename = file_info.name
-    
-    # Use metadata title if available, otherwise use parsed title or filename
-    final_display_name = display_name
-    if not final_display_name:
+    print("Starting song addition process")
+    for file_path in songs.songs:
+        # Check if file exists
+        if not os.path.exists(file_path):
+            errors.append(f"File not found: {file_path}")
+            continue
+        
+
+        # Check if it's an audio file
+        valid_extensions = AUDIO_EXTENSIONS
+        file_ext = Path(file_path).suffix.lower()
+        if file_ext not in valid_extensions:
+            errors.append(f"Invalid audio file format: {file_path}")
+            continue
+
+        # Check if song already exists
+        existing_song = db.query(Song).filter(Song.file_path == file_path).first()
+        if existing_song:
+            errors.append(f"Song already exists in database: {file_path}")
+            continue
+
+        # Check file size - reject zero-length files
+        file_info = Path(file_path)
+        file_size = file_info.stat().st_size
+        if file_size == 0:
+            errors.append(f"File '{file_path}' is empty (0 bytes) and cannot be added")
+            continue
+
+        # Analyze audio and extract metadata
+        try:
+            analysis = audio_analyzer.analyze_song(file_path)
+        except Exception as e:
+            errors.append(f"Failed to analyze audio: {str(e)}")
+        
+        # Get filename (file_info already retrieved above for size check)
+        filename = file_info.name
+        
+        # Use metadata title if available, otherwise use parsed title or filename
+
         final_display_name = (
-            analysis.get('title') or 
-            analysis.get('parsed_title') or 
+            analysis.get('title') or
+            analysis.get('parsed_title') or
             filename
         )
-    
-    # Extract year from date if it's a full date
-    year_value = analysis.get('year')
-    if year_value and isinstance(year_value, str):
-        try:
-            # Try to extract year from date strings like "2023-01-01"
-            year_value = int(year_value.split('-')[0])
-        except (ValueError, IndexError):
-            year_value = None
-    elif year_value:
-        try:
-            year_value = int(year_value)
-        except (ValueError, TypeError):
-            year_value = None
-    
-    # Get track number from metadata or filename parsing
-    track_number = (
-        analysis.get('track') or 
-        analysis.get('parsed_track')
-    )
-    
-    # Create song record
-    song = Song(
-        filename=filename,
-        display_name=final_display_name,
-        file_path=file_path,
-        file_size=file_info.stat().st_size,
-        duration=analysis.get('duration'),
-        tempo=analysis.get('tempo'),
-        key=analysis.get('key'),
-        energy=analysis.get('energy', 0.5),
-        valence=analysis.get('valence', 0.5),
-        danceability=analysis.get('danceability', 0.5),
-        artist=analysis.get('artist'),
-        album=analysis.get('album'),
-        year=year_value,
-        genre=analysis.get('genre'),
-        track_number=track_number
-    )
-    
-    db.add(song)
-    db.commit()
-    db.refresh(song)
-    
-    return song
+        
+        # Extract year from date if it's a full date
+        year_value = analysis.get('year')
+        if year_value and isinstance(year_value, str):
+            try:
+                # Try to extract year from date strings like "2023-01-01"
+                year_value = int(year_value.split('-')[0])
+            except (ValueError, IndexError):
+                year_value = None
+        elif year_value:
+            try:
+                year_value = int(year_value)
+            except (ValueError, TypeError):
+                year_value = None
+        
+        # Get track number from metadata or filename parsing
+        track_number = (
+            analysis.get('track') or 
+            analysis.get('parsed_track')
+        )
+        
+        # Create song record
+        song = Song(
+            filename=filename,
+            display_name=final_display_name,
+            file_path=file_path,
+            file_size=file_info.stat().st_size,
+            duration=analysis.get('duration'),
+            tempo=analysis.get('tempo'),
+            key=analysis.get('key'),
+            energy=analysis.get('energy', 0.5),
+            valence=analysis.get('valence', 0.5),
+            danceability=analysis.get('danceability', 0.5),
+            artist=analysis.get('artist'),
+            album=analysis.get('album'),
+            year=year_value,
+            genre=analysis.get('genre'),
+            track_number=track_number
+        )
+        added.append(song)
 
-@router.post("/upload-file")
+    for song in added:
+        db.add(song)
+    db.commit()
+    for song in added:
+        db.refresh(song)
+    print("Found:", len(found))
+    print("Added:", len(added))
+    print("Errors:", len(errors))
+    if errors:
+        print("Error details:")
+        for error in errors:
+            print(f" - {error}")
+    return {"found":len(found),"added": len(added), "errors": len(errors)}
+
+@router.post("/remove")
+async def remove_songs(
+    songs: RemoveSongsRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Remove songs by file paths (for undo functionality).
+    """
+    removed = 0
+    errors = []
+
+    for file_path in songs.paths:
+        # Find song by file path
+        existing_song = db.query(Song).filter(Song.file_path == file_path).first()
+        if existing_song:
+            db.delete(existing_song)
+            removed += 1
+        else:
+            errors.append(f"Song not found in database: {file_path}")
+
+    db.commit()
+    return {"removed": removed, "errors": errors}
+
+@router.post("/upload-file", deprecated=True)
 async def upload_song_file(
     file: UploadFile,
     display_name: Optional[str] = Form(None),

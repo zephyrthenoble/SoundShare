@@ -236,12 +236,18 @@ class FileBrowser {
         const selectedCount = document.getElementById('selectedCount');
         const addButton = document.getElementById('addSongsBtn') || document.getElementById('addDirectoriesBtn');
         
-        selectedCount.textContent = this.selectedItems.size;
+        // Only update selectedCount if it exists (for backward compatibility)
+        if (selectedCount) {
+            selectedCount.textContent = this.selectedItems.size;
+        }
         
         // Update button state
         if (addButton) {
             addButton.disabled = this.selectedItems.size === 0;
         }
+        
+        // Emit selection change event for add_paths.html
+        this.emitSelectionChange();
         
         if (this.selectedItems.size === 0) {
             selectedList.innerHTML = '<div class="text-muted">No items selected</div>';
@@ -262,6 +268,32 @@ class FileBrowser {
         }).join('');
         
         selectedList.innerHTML = items;
+    }
+    
+    emitSelectionChange() {
+        // Create array of selected items with metadata
+        const selectedItems = Array.from(this.selectedItems).map(path => {
+            // Find the checkbox for this path by iterating through all checkboxes
+            let isDirectory = false;
+            const checkboxes = document.querySelectorAll('#fileList input[type="checkbox"]');
+            for (const checkbox of checkboxes) {
+                if (checkbox.dataset.path === path) {
+                    isDirectory = checkbox.dataset.type === 'directory';
+                    break;
+                }
+            }
+            
+            return {
+                path: path,
+                isDirectory: isDirectory
+            };
+        });
+        
+        // Emit custom event that add_paths.html can listen to
+        const event = new CustomEvent('fileBrowserSelectionChanged', {
+            detail: { selectedItems: selectedItems }
+        });
+        document.dispatchEvent(event);
     }
     
     updateCheckboxes() {

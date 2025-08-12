@@ -78,6 +78,11 @@ async def add_songs_page(request: Request):
 async def add_scan_directories_page(request: Request):
     return templates.TemplateResponse("add_scan_directories.html", {"request": request})
 
+@app.get("/library/add-paths", response_class=HTMLResponse)
+async def add_paths(request: Request):
+    return templates.TemplateResponse("add_paths.html", {"request": request})
+
+
 def main():
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
 

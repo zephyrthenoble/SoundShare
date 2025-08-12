@@ -161,7 +161,15 @@ class NotificationSystem {
 
         // Call the action handler
         if (notificationData.config.action.handler) {
-            notificationData.config.action.handler();
+            const handler = notificationData.config.action.handler;
+            const args = notificationData.config.action.handlerArgs;
+            
+            if (args !== null && args !== undefined) {
+                console.log('action args:', args);
+                handler(args);
+            } else {
+                handler();
+            }
         }
 
         // Dismiss the notification
@@ -237,7 +245,7 @@ class NotificationSystem {
         return this.show({ type: 'error', title, message, ...options });
     }
 
-    undo(title, message, undoHandler, onExpire, countdown = 5) {
+    undo(title, message, undoHandler, onExpire, countdown = 5, undoArgs = null) {
         return this.show({
             type: 'warning',
             title,
@@ -245,6 +253,7 @@ class NotificationSystem {
             action: {
                 label: 'Undo',
                 handler: undoHandler,
+                handlerArgs: undoArgs,
                 isUndo: true,
                 countdown,
                 onExpire
@@ -261,6 +270,6 @@ function showNotification(type, title, message, options = {}) {
     return notificationSystem.show({ type, title, message, ...options });
 }
 
-function showUndo(title, message, undoHandler, onExpire, countdown = 5) {
-    return notificationSystem.undo(title, message, undoHandler, onExpire, countdown);
+function showUndo(title, message, undoHandler, onExpire, countdown = 5, undoArgs = null) {
+    return notificationSystem.undo(title, message, undoHandler, onExpire, countdown, undoArgs);
 }

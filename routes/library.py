@@ -17,6 +17,9 @@ templates = Jinja2Templates(directory="src/soundshare/templates")
 # Pydantic models for API requests
 class AddSongRequest(BaseModel):
     path: str
+    
+class AddSongsRequest(BaseModel):
+    songs: List[str]
 
 class AddScanDirectoriesRequest(BaseModel):
     paths: List[str]
