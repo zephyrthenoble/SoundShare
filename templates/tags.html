@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadTagGroups() {
     try {
-        const response = await fetch('/api/tags/groups');
+        const response = await fetch('/api/groups/');
         tagGroups = await response.json();
         
         const tagsResponse = await fetch('/api/tags/');
@@ -237,7 +237,7 @@ async function saveGroup() {
     };
     
     try {
-        const url = groupId ? `/api/tags/groups/${groupId}` : '/api/tags/groups';
+        const url = groupId ? `/api/groups/${groupId}` : '/api/groups/';
         const method = groupId ? 'PUT' : 'POST';
         
         const response = await fetch(url, {
@@ -295,7 +295,7 @@ async function saveTag() {
 async function deleteGroup(groupId) {
     if (confirm('Are you sure you want to delete this group? All tags in this group will become ungrouped.')) {
         try {
-            const response = await fetch(`/api/tags/groups/${groupId}`, {
+            const response = await fetch(`/api/groups/${groupId}`, {
                 method: 'DELETE'
             });
             

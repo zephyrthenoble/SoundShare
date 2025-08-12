@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 import uvicorn
 
 from database.database import engine, Base
-from routes import songs, playlists, tags, groups, dynamic_playlists
+from routes import songs, playlists, tags, groups, dynamic_playlists, library
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -24,6 +24,7 @@ app.include_router(playlists.router, prefix="/api/playlists", tags=["playlists"]
 app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
 app.include_router(groups.router, prefix="/api/groups", tags=["groups"])
 app.include_router(dynamic_playlists.router, prefix="/api/dynamic-playlists", tags=["dynamic-playlists"])
+app.include_router(library.router, prefix="/api/library", tags=["library"])
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -64,6 +65,18 @@ async def songs_page(request: Request):
 @app.get("/tags", response_class=HTMLResponse)
 async def tags_page(request: Request):
     return templates.TemplateResponse("tags.html", {"request": request})
+
+@app.get("/library", response_class=HTMLResponse)
+async def library_page(request: Request):
+    return templates.TemplateResponse("library.html", {"request": request})
+
+@app.get("/library/add-songs", response_class=HTMLResponse)
+async def add_songs_page(request: Request):
+    return templates.TemplateResponse("add_songs.html", {"request": request})
+
+@app.get("/library/add-scan-directories", response_class=HTMLResponse)
+async def add_scan_directories_page(request: Request):
+    return templates.TemplateResponse("add_scan_directories.html", {"request": request})
 
 def main():
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

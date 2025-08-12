@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Add Songs - SoundShare{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header with back button -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="d-flex align-items-center">
+                <a href="/library" class="btn btn-outline-secondary me-3">
+                    <i class="fas fa-arrow-left"></i> Back to Library
+                </a>
+                <h2 class="mb-0">Add Songs</h2>
+            </div>
+            <p class="text-muted mt-2">Browse and select individual songs to add to your library.</p>
+        </div>
+    </div>
+
+    <!-- File Browser Container -->
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Browse Files</h5>
+                    <button class="btn btn-sm btn-outline-secondary" id="refreshBtn">
+                        <i class="fas fa-refresh"></i> Refresh
+                    </button>
+                </div>
+                <div class="card-body" style="height: 70vh;">
+                    <!-- Breadcrumb Navigation -->
+                    <nav aria-label="breadcrumb" class="mb-3">
+                        <ol class="breadcrumb mb-0" id="breadcrumb"></ol>
+                    </nav>
+                    
+                    <!-- File Browser Content -->
+                    <div class="row h-100">
+                        <div class="col-8 border-end">
+                            <div id="fileList" class="h-100 overflow-auto"></div>
+                        </div>
+                        <div class="col-4">
+                            <h6>Selected Songs (<span id="selectedCount">0</span>)</h6>
+                            <div id="selectedList" class="h-75 overflow-auto border rounded p-2 bg-light mb-3"></div>
+                            <button class="btn btn-primary w-100" id="addSongsBtn" disabled>
+                                <i class="fas fa-plus"></i> Add Selected Songs
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Progress Modal -->
+<div class="modal fade" id="progressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adding Songs</h5>
+            </div>
+            <div class="modal-body">
+                <div class="progress mb-3">
+                    <div class="progress-bar" role="progressbar" style="width: 0%" id="progressBar"></div>
+                </div>
+                <div class="row text-center">
+                    <div class="col-4">
+                        <h6 class="text-success">Added</h6>
+                        <span class="h4" id="addedCount">0</span>
+                    </div>
+                    <div class="col-4">
+                        <h6 class="text-primary">Processing</h6>
+                        <span class="h4" id="processingCount">0</span>
+                    </div>
+                    <div class="col-4">
+                        <h6 class="text-danger">Errors</h6>
+                        <span class="h4" id="errorCount">0</span>
+                    </div>
+                </div>
+                <div id="currentFile" class="text-muted small mt-2 text-center"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="closeProgressBtn" style="display: none;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="/static/js/file-browser.js"></script>
+
+<script>
+// Initialize page-specific file browser
+let pageBrowser = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize file browser with songs-only configuration
+    pageBrowser = new FileBrowser({
+        disableDirectories: true,  // Can't select directories, only navigate
+        disableFiles: false,       // Allow file selection
+        multiSelect: true
+    });
+    
+    // Start browsing immediately
+    pageBrowser.initializePage();
+    
+    // Bind page-specific events
+    bindPageEvents();
+});
+
+function bindPageEvents() {
+    // Refresh button
+    document.getElementById('refreshBtn').addEventListener('click', () => {
+        pageBrowser.loadDirectory();
+    });
+    
+    // Add songs button
+    document.getElementById('addSongsBtn').addEventListener('click', () => {
+        const selectedSongs = Array.from(pageBrowser.selectedItems);
+        if (selectedSongs.length > 0) {
+            addSongs(selectedSongs);
+        }
+    });
+}
+
+async function addSongs(songPaths) {
+    const progressModal = new bootstrap.Modal(document.getElementById('progressModal'));
+    progressModal.show();
+    
+    const progressBar = document.getElementById('progressBar');
+    const addedCount = document.getElementById('addedCount');
+    const processingCount = document.getElementById('processingCount');
+    const errorCount = document.getElementById('errorCount');
+    const currentFile = document.getElementById('currentFile');
+    const closeBtn = document.getElementById('closeProgressBtn');
+    
+    let added = 0, errors = 0;
+    const total = songPaths.length;
+    
+    for (let i = 0; i < songPaths.length; i++) {
+        const songPath = songPaths[i];
+        const fileName = songPath.split('/').pop() || songPath.split('\\').pop();
+        
+        currentFile.textContent = `Processing: ${fileName}`;
+        processingCount.textContent = i + 1;
+        
+        try {
+            const response = await fetch('/api/library/add-song', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ path: songPath })
+            });
+            
+            if (response.ok) {
+                added++;
+                addedCount.textContent = added;
+            } else {
+                errors++;
+                errorCount.textContent = errors;
+            }
+        } catch (error) {
+            errors++;
+            errorCount.textContent = errors;
+        }
+        
+        // Update progress
+        const progress = ((i + 1) / total) * 100;
+        progressBar.style.width = progress + '%';
+    }
+    
+    currentFile.textContent = 'Complete!';
+    processingCount.textContent = total;
+    closeBtn.style.display = 'block';
+    
+    // Show completion notification
+    if (added > 0) {
+        notificationSystem.success('Songs Added', `Successfully added ${added} song${added === 1 ? '' : 's'} to the library.`);
+    }
+    if (errors > 0) {
+        notificationSystem.warning('Some Errors', `${errors} song${errors === 1 ? '' : 's'} could not be added. Check the progress details.`);
+    }
+    
+    // Auto-refresh the file browser to show updated "already added" status
+    setTimeout(() => {
+        pageBrowser.loadDirectory();
+    }, 1000);
+}
+</script>
+{% endblock %}

@@ -100,7 +100,9 @@ class Song(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     last_played = Column(DateTime)  # Track when song was last played
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
+
+    manually_added = Column(Boolean, default=False)
+
     tags = relationship("Tag", secondary=song_tags, back_populates="songs")
 
 class ScannedDirectory(Base):

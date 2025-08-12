@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block title %}Library - SoundShare{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1>Library</h1>
+  <div class="btn-group">
+    <a href="/library/add-songs" class="btn btn-primary"><i class="fas fa-plus"></i> Add Songs</a>
+    <a href="/library/add-scan-directories" class="btn btn-info"><i class="fas fa-folder-plus"></i> Add Scan Directories</a>
+  </div>
+</div>
+<div class="row">
+  <div class="col-lg-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-0">Added Songs</h5>
+          <small class="text-muted">Songs explicitly added (not via path scan)</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-secondary" id="manualCount">0</span>
+          <a href="/library/add-songs" class="btn btn-sm btn-outline-primary" title="Add Songs"><i class="fas fa-plus"></i></a>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="table-light">
+            <tr><th>Name</th><th>Folder</th><th></th></tr>
+          </thead>
+          <tbody id="manualSongsBody"></tbody>
+        </table>
+        <nav><ul class="pagination pagination-sm m-2" id="manualPagination"></ul></nav>
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-6 mb-4">
+    <div class="card h-100">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-0">Scan Directories</h5>
+          <small class="text-muted">Directories automatically scanned for music files</small>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge bg-secondary" id="pathCount">0</span>
+          <a href="/library/add-scan-directories" class="btn btn-sm btn-outline-secondary" title="Add Scan Directories"><i class="fas fa-folder-plus"></i></a>
+        </div>
+      </div>
+      <div class="card-body p-0">
+        <table class="table table-sm mb-0">
+          <thead class="table-light"><tr><th>Path</th><th>Songs</th><th></th></tr></thead>
+          <tbody id="pathsBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <h5 class="mb-0">Directory Tree</h5>
+          <small class="text-muted">All song file paths (collapsible)</small>
+        </div>
+        <div class="input-group input-group-sm" style="width:250px;">
+          <span class="input-group-text"><i class="fas fa-search"></i></span>
+          <input class="form-control" id="treeFilter" placeholder="Filter..." oninput="filterTree()" />
+        </div>
+      </div>
+      <div class="card-body" style="max-height:400px; overflow:auto;">
+        <ul class="list-unstyled" id="directoryTree"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<script src="/static/js/file-browser.js"></script>
+<script>
+  
+const PAGE_SIZE = 25;
+let manualSongs = [];
+let paths = [];
+let directoryTree = {};
+
+async function loadLibrary() {
+  try {
+    const resp = await fetch('/api/library/');
+    if(!resp.ok){ 
+      console.error('Failed to load library:', resp.status, resp.statusText); 
+      return; 
+    }
+    const data = await resp.json();
+    manualSongs = data.manual_songs || [];
+    paths = data.paths || [];
+    directoryTree = data.tree || {};
+    renderManualSongs(1);
+    renderPaths();
+    renderTree();
+  } catch (error) {
+    console.error('Error loading library:', error);
+  }
+}
+
+function renderManualSongs(page){
+  const body = document.getElementById('manualSongsBody');
+  const start = (page-1)*PAGE_SIZE; 
+  const slice = manualSongs.slice(start,start+PAGE_SIZE);
+  
+  document.getElementById('manualCount').textContent = manualSongs.length;
+  
+  if (slice.length === 0) {
+    body.innerHTML = '<tr><td colspan="3" class="text-muted text-center">No manually added songs</td></tr>';
+    document.getElementById('manualPagination').innerHTML = '';
+    return;
+  }
+  
+  body.innerHTML = slice.map(s => `
+    <tr>
+      <td><strong>${s.display_name}</strong></td>
+      <td><small class="text-muted">${s.file_path}</small></td>
+      <td><button class="btn btn-sm btn-outline-danger" onclick="deleteManualSong(${s.id})"><i class="fas fa-trash"></i></button></td>
+    </tr>
+  `).join('');
+  
+  // Simple pagination
+  const totalPages = Math.ceil(manualSongs.length / PAGE_SIZE);
+  let paginationHTML = '';
+  for (let i = 1; i <= totalPages; i++) {
+    const active = i === page ? 'active' : '';
+    paginationHTML += `<li class="page-item ${active}"><a class="page-link" href="#" onclick="renderManualSongs(${i})">${i}</a></li>`;
+  }
+  document.getElementById('manualPagination').innerHTML = paginationHTML;
+}
+
+function renderPaths(){
+  const body = document.getElementById('pathsBody');
+  document.getElementById('pathCount').textContent = paths.length;
+  
+  if (paths.length === 0) {
+    body.innerHTML = '<tr><td colspan="3" class="text-muted text-center">No scan directories configured</td></tr>';
+    return;
+  }
+  
+  body.innerHTML = paths.map(p => `
+    <tr>
+      <td><strong>${p.directory_path}</strong><br><small class="text-muted">Last scanned: ${p.last_scanned || 'Never'}</small></td>
+      <td>${p.song_count || 0}</td>
+      <td><button class="btn btn-sm btn-outline-danger" onclick="deletePath(${p.id})"><i class="fas fa-trash"></i></button></td>
+    </tr>
+  `).join('');
+}
+
+function renderTree(){
+  const container = document.getElementById('directoryTree');
+  if (Object.keys(directoryTree).length === 0) {
+    container.innerHTML = '<li class="text-muted">No songs in library</li>';
+    return;
+  }
+  
+  const html = Object.entries(directoryTree).map(([folder, data]) => `
+    <li>
+      <div class="d-flex align-items-center">
+        <i class="fas fa-folder me-2"></i>
+        <strong>${folder}</strong>
+        <span class="badge bg-secondary ms-2">${data.songs ? data.songs.length : 0}</span>
+      </div>
+      ${data.songs && data.songs.length > 0 ? `
+        <ul class="list-unstyled ms-4 mt-1">
+          ${data.songs.map(song => `<li><i class="fas fa-file-audio me-2"></i>${song.display_name}</li>`).join('')}
+        </ul>
+      ` : ''}
+    </li>
+  `).join('');
+  
+  container.innerHTML = html;
+}
+
+function filterTree() {
+  const filter = document.getElementById('treeFilter').value.toLowerCase();
+  const items = document.querySelectorAll('#directoryTree li');
+  
+  items.forEach(item => {
+    const text = item.textContent.toLowerCase();
+    item.style.display = text.includes(filter) ? '' : 'none';
+  });
+}
+
+async function deletePath(id) {
+  if (!confirm('Delete this scan directory? This will also remove all songs found in this directory.')) return;
+  
+  try {
+    await fetch(`/api/library/paths/${id}`, {method: 'DELETE'});
+    loadLibrary();
+  } catch (error) {
+    console.error('Error deleting path:', error);
+    notificationSystem.error('Error', 'Failed to delete path. Please try again.');
+  }
+}
+
+async function deleteManualSong(id) {
+  if (!confirm('Delete this song?')) return;
+  
+  try {
+    await fetch(`/api/songs/${id}`, {method: 'DELETE'});
+    loadLibrary();
+  } catch (error) {
+    console.error('Error deleting song:', error);
+    notificationSystem.error('Error', 'Failed to delete song. Please try again.');
+  }
+}
+
+// Load library on page load
+document.addEventListener('DOMContentLoaded', loadLibrary);
+</script>
+{% endblock %}
