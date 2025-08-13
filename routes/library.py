@@ -5,14 +5,126 @@ from pathlib import Path
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime, UTC
+import os
 
 from database.database import get_db
 from database.models import Song, ScannedDirectory
 from utils.config import get_library_path
 from utils.constants import AUDIO_EXTENSIONS
+from services.audio_analyzer import AudioAnalyzer
 
 router = APIRouter()
 templates = Jinja2Templates(directory="src/soundshare/templates")
+audio_analyzer = AudioAnalyzer()
+
+async def _analyze_and_create_song(file_path: str, manually_added: bool = False):
+    """
+    Analyze a single audio file and create a Song object with full metadata.
+    Returns (song, error) tuple where one will be None.
+    """
+    try:
+        # Check if file exists
+        if not os.path.exists(file_path):
+            return None, f"File not found: {file_path}"
+
+        # Check if it's an audio file
+        valid_extensions = AUDIO_EXTENSIONS
+        file_ext = Path(file_path).suffix.lower()
+        if file_ext not in valid_extensions:
+            return None, f"Invalid audio file format: {file_path}"
+
+        # Check file size - reject zero-length files
+        file_info = Path(file_path)
+        file_size = file_info.stat().st_size
+        if file_size == 0:
+            return None, f"File '{file_path}' is empty (0 bytes) and cannot be added"
+
+        # Analyze audio and extract metadata
+        try:
+            analysis = audio_analyzer.analyze_song(file_path)
+        except Exception as e:
+            return None, f"Failed to analyze audio for {file_path}: {str(e)}"
+        
+        # Get filename
+        filename = file_info.name
+        
+        # Use metadata title if available, otherwise use parsed title or filename
+        final_display_name = (
+            analysis.get('title') or
+            analysis.get('parsed_title') or
+            filename
+        )
+        
+        # Extract year from date if it's a full date
+        year_value = analysis.get('year')
+        if year_value and isinstance(year_value, str):
+            try:
+                year_value = int(year_value.split('-')[0])
+            except (ValueError, IndexError):
+                year_value = None
+        elif year_value:
+            try:
+                year_value = int(year_value)
+            except (ValueError, TypeError):
+                year_value = None
+        
+        # Get track number from metadata or filename parsing
+        track_number = (
+            analysis.get('track') or 
+            analysis.get('parsed_track')
+        )
+        
+        # Create song record with full metadata
+        song = Song(
+            filename=filename,
+            display_name=final_display_name,
+            file_path=file_path,
+            file_size=file_size,
+            duration=analysis.get('duration'),
+            tempo=analysis.get('tempo'),
+            key=analysis.get('key'),
+            energy=analysis.get('energy', 0.5),
+            valence=analysis.get('valence', 0.5),
+            danceability=analysis.get('danceability', 0.5),
+            artist=analysis.get('artist'),
+            album=analysis.get('album'),
+            year=year_value,
+            genre=analysis.get('genre'),
+            track_number=track_number,
+            manually_added=manually_added
+        )
+        
+        print(f"Analyzed song: {final_display_name} from {file_path}")
+        return song, None
+        
+    except Exception as e:
+        return None, f"Unexpected error processing {file_path}: {str(e)}"
+
+async def _create_songs_from_paths(file_paths: List[str], db: Session, manually_added: bool = False):
+    """
+    Shared function to create song records from file paths with full metadata analysis.
+    Returns (added_songs, errors) tuple.
+    """
+    added_songs = []
+    errors = []
+
+    print(f"Processing {len(file_paths)} file paths, manually_added={manually_added}")
+    
+    for file_path in file_paths:
+        # Check if song already exists
+        existing_song = db.query(Song).filter(Song.file_path == file_path).first()
+        if existing_song:
+            errors.append(f"Song already exists in database: {file_path}")
+            continue
+
+        # Analyze and create song
+        song, error = await _analyze_and_create_song(file_path, manually_added)
+        if error:
+            errors.append(error)
+        else:
+            added_songs.append(song)
+
+    return added_songs, errors
 
 # Pydantic models for API requests
 class AddSongRequest(BaseModel):
@@ -259,15 +371,30 @@ async def add_scan_directories(request: AddScanDirectoriesRequest, db: Session =
 async def remove_scan_directories(request: RemoveScanDirectoriesRequest, db: Session = Depends(get_db)):
     """Remove directories from scan list (for undo functionality)"""
     removed_count = 0
+    total_songs_removed = 0
     
     for dir_path in request.paths:
         scan_dir = db.query(ScannedDirectory).filter(ScannedDirectory.directory_path == dir_path).first()
         if scan_dir:
+            # Remove songs under this directory path that were not manually added
+            prefix = scan_dir.directory_path.rstrip("/\\")
+            songs = db.query(Song).filter(Song.file_path.like(f"{prefix}%")).all()
+            songs_removed = 0
+            for s in songs:
+                if not s.manually_added:
+                    print(f"Removing song: {s.file_path} (from directory removal)")
+                    db.delete(s)
+                    songs_removed += 1
+            
+            total_songs_removed += songs_removed
+            print(f"Removed {songs_removed} songs from directory: {dir_path}")
+            
+            # Remove the directory from scan list
             db.delete(scan_dir)
             removed_count += 1
     
     db.commit()
-    return {"message": f"Removed {removed_count} directories"}
+    return {"message": f"Removed {removed_count} directories and {total_songs_removed} songs"}
 
 @router.post("/directory/remove-by-id")
 async def remove_scan_directories_by_id(request: RemoveScanDirectoriesByIdRequest, db: Session = Depends(get_db)):
@@ -275,6 +402,8 @@ async def remove_scan_directories_by_id(request: RemoveScanDirectoriesByIdReques
     removed_count = 0
     removed_paths = []
     errors = []
+    total_songs_removed = 0
+    removed_songs_data = []
     
     if len(request.ids) == 0:
         raise HTTPException(status_code=400, detail="No directory IDs provided")
@@ -284,7 +413,34 @@ async def remove_scan_directories_by_id(request: RemoveScanDirectoriesByIdReques
     for dir_id in request.ids:
         scan_dir = db.query(ScannedDirectory).filter(ScannedDirectory.id == dir_id).first()
         if scan_dir:
-            removed_paths.append(scan_dir.directory_path)  # Store path for undo
+            # Remove songs under this directory path that were not manually added
+            prefix = scan_dir.directory_path.rstrip("/\\")
+            songs = db.query(Song).filter(Song.file_path.like(f"{prefix}%")).all()
+            songs_removed = 0
+            songs_from_this_dir = []
+            
+            for s in songs:
+                if not s.manually_added:
+                    print(f"Removing song: {s.file_path} (from directory ID {dir_id} removal)")
+                    songs_from_this_dir.append({
+                        "id": s.id,
+                        "file_path": s.file_path,
+                        "display_name": s.display_name
+                    })
+                    db.delete(s)
+                    songs_removed += 1
+            
+            total_songs_removed += songs_removed
+            removed_songs_data.append({
+                "directory_path": scan_dir.directory_path,
+                "songs": songs_from_this_dir
+            })
+            print(f"Removed {songs_removed} songs from directory ID {dir_id}: {scan_dir.directory_path}")
+            
+            # Store path for undo functionality
+            removed_paths.append(scan_dir.directory_path)
+            
+            # Remove the directory from scan list
             db.delete(scan_dir)
             removed_count += 1
             print(f"Removed directory ID {dir_id}: {scan_dir.directory_path}")
@@ -294,8 +450,16 @@ async def remove_scan_directories_by_id(request: RemoveScanDirectoriesByIdReques
     
     db.commit()
     print(f"Removed directories: {removed_count}")
+    print(f"Removed songs: {total_songs_removed}")
     print(f"Errors: {errors}")
-    return {"message": f"Removed {removed_count} directories", "removed": removed_count, "errors": errors, "removed_paths": removed_paths}
+    return {
+        "message": f"Removed {removed_count} directories and {total_songs_removed} songs", 
+        "removed": removed_count, 
+        "songs_removed": total_songs_removed,
+        "errors": errors, 
+        "removed_paths": removed_paths,
+        "removed_songs_data": removed_songs_data
+    }
 
 @router.post("/scan")
 async def scan_directories(request: ScanDirectoriesRequest, db: Session = Depends(get_db)):
@@ -315,51 +479,60 @@ async def scan_all_directories(db: Session = Depends(get_db)):
     return await scan_local_directories(paths, db)
 
 async def scan_local_directories(paths: List[str], db: Session=Depends(get_db)):
-    """Scan directories for new music files"""
+    """Scan directories for new music files using comprehensive metadata analysis"""
 
-    found = 0
-    added = 0
-    errors = 0
+    all_file_paths = []
+    directory_errors = 0
     
+    # First, collect all audio file paths from all directories
     for dir_path in paths:
         try:
             print(f"Scanning directory: {dir_path}")
             path = Path(dir_path)
             if not path.exists() or not path.is_dir():
-                errors += 1
+                directory_errors += 1
+                print(f"Directory does not exist or is not a directory: {dir_path}")
                 continue
                 
             # Recursively find audio files
             for file_path in path.rglob('*'):
-                print(f"Found file: {file_path}")
                 if file_path.suffix.lower() in AUDIO_EXTENSIONS:
-                    found += 1
-                    
-                    # Check if already exists
-                    existing = db.query(Song).filter(Song.file_path == str(file_path)).first()
-                    if not existing:
-                        try:
-                            song = Song(
-                                filename=file_path.name,
-                                file_path=str(file_path),
-                                display_name=file_path.stem,
-                                manually_added=False
-                            )
-                            print(song)
-                            db.add(song)
-                            added += 1
-                        except Exception:
-                            errors += 1
+                    all_file_paths.append(str(file_path))
+                    print(f"Found audio file: {file_path}")
                             
-        except Exception:
-            errors += 1
+        except Exception as e:
+            directory_errors += 1
+            print(f"Error scanning directory {dir_path}: {str(e)}")
+    
+    print(f"Found {len(all_file_paths)} audio files across {len(paths)} directories")
+    
+    # Use shared function to create songs with full metadata (not manually added)
+    added_songs, file_errors = await _create_songs_from_paths(all_file_paths, db, manually_added=False)
+    
+    # Add all songs to database
+    for song in added_songs:
+        db.add(song)
     
     # Update last_scanned timestamp for the directories
     for dir_path in paths:
         scan_dir = db.query(ScannedDirectory).filter(ScannedDirectory.directory_path == dir_path).first()
         if scan_dir:
-
             scan_dir.last_scanned = datetime.now(tz=UTC)
 
     db.commit()
-    return {"found": found, "added": added, "errors": errors}
+    
+    # Refresh all songs to get their IDs
+    for song in added_songs:
+        db.refresh(song)
+    
+    total_errors = directory_errors + len(file_errors)
+    
+    print(f"Scan complete: Found {len(all_file_paths)} files, added {len(added_songs)} songs, {total_errors} errors")
+    if file_errors:
+        print("File processing errors:")
+        for error in file_errors[:10]:  # Show first 10 errors
+            print(f" - {error}")
+        if len(file_errors) > 10:
+            print(f" - ... and {len(file_errors) - 10} more errors")
+    
+    return {"found": len(all_file_paths), "added": len(added_songs), "errors": total_errors}

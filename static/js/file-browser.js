@@ -354,6 +354,7 @@ async function removeFromSystem(itemId, itemType, itemName, buttonElement) {
         if (response.ok) {
             const result = await response.json();
             const removed = result.removed || 0;
+            const songsRemoved = result.songs_removed || 0;
             const errors = result.errors || [];
             const removedPaths = result.removed_paths || [];
 
@@ -368,10 +369,16 @@ async function removeFromSystem(itemId, itemType, itemName, buttonElement) {
             }
             
             if (removed > 0) {
+                // Create appropriate success message
+                let message = `Successfully removed "${itemName}" from your ${isDirectory ? 'scan list' : 'library'}.`;
+                if (isDirectory && songsRemoved > 0) {
+                    message += ` Also removed ${songsRemoved} song${songsRemoved === 1 ? '' : 's'} from this directory.`;
+                }
+                
                 // Show success notification with undo option
                 notificationSystem.undo(
                     `${isDirectory ? 'Directory' : 'Song'} Removed`,
-                    `Successfully removed "${itemName}" from your ${isDirectory ? 'scan list' : 'library'}.`,
+                    message,
                     undoRemoveFromSystem,
                     () => {
                         // On undo timeout, refresh the file browser
@@ -380,7 +387,7 @@ async function removeFromSystem(itemId, itemType, itemName, buttonElement) {
                         }
                     },
                     5,
-                    { paths: removedPaths, type: itemType, name: itemName }
+                    { paths: removedPaths, type: itemType, name: itemName, songsRemoved: songsRemoved }
                 );
             }
             

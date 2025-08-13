@@ -131,6 +131,9 @@
                     <button class="btn btn-primary" onclick="openBatchPlaylistModal()">
                         <i class="fas fa-list"></i> Add to Playlist
                     </button>
+                    <button class="btn btn-info" onclick="openRescanModal()">
+                        <i class="fas fa-sync-alt"></i> Rescan
+                    </button>
                     <button class="btn btn-danger" onclick="batchDeleteSongs()">
                         <i class="fas fa-trash"></i> Delete Selected
                     </button>
@@ -484,6 +487,51 @@
     </div>
 </div>
 
+<!-- Rescan Songs Modal -->
+<div class="modal fade" id="rescanModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Rescan Songs</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="rescanInfo">0 songs selected</span>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Rescan Mode</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="rescanMode" id="overwriteMode" value="overwrite" checked>
+                        <label class="form-check-label" for="overwriteMode">
+                            <strong>Overwrite All Metadata</strong>
+                            <br><small class="text-muted">Replace all existing metadata with fresh analysis</small>
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="rescanMode" id="fillMissingMode" value="fill_missing">
+                        <label class="form-check-label" for="fillMissingMode">
+                            <strong>Fill Missing Metadata Only</strong>
+                            <br><small class="text-muted">Only update empty or missing fields, keep existing data</small>
+                        </label>
+                    </div>
+                </div>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    This will re-analyze the audio files and may take some time for large selections.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" onclick="applyRescan()">
+                    <i class="fas fa-sync-alt"></i> Rescan Songs
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Undo Notification -->
 <div id="undoNotification" class="alert alert-warning alert-dismissible fade" 
      style="position: fixed; top: 20px; right: 20px; z-index: 1055; min-width: 300px; display: none;">
@@ -610,7 +658,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadSongs() {
     try {
-        const response = await fetch('/api/songs/');
+        const response = await fetch('/api/songs/with-folders');
         songs = await response.json();
         filteredSongs = [...songs];
         populateFilterDropdowns();
@@ -708,12 +756,11 @@ function renderSongsTable() {
                        ${isSelected ? 'checked' : ''} onchange="toggleSongSelection(${song.id})">
             </td>
             <td class="song-name-cell" title="${song.display_name}" style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.display_name}</td>
-            <td class="song-folder-cell" title="${getFolder(song.file_path)}" style="max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><small class="text-muted">${getFolder(song.file_path)}</small></td>
+            <td class="song-folder-cell" title="${song.folder || ''}" style="max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><small class="text-muted">${song.folder || ''}</small></td>
             <td class="song-album-cell" title="${song.album || ''}" style="max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.album || ''}</td>
             <td class="song-track-cell">${song.track_number || ''}</td>
             <td><small>${formatDuration(song.duration)}</small></td>
             <td style="padding: 4px; height: 40px; vertical-align: middle;">
-                <!-- HARDCODED TEST BARS FOR DEBUGGING -->
                 <div class="mood-bars" title="Test: Energy: ${energy}% | Valence: ${valence}% | Danceability: ${danceability}%" style="height: 32px !important; min-height: 32px !important; display: flex !important; flex-direction: column !important;">
                     <div class="mood-bar-container" style="height: 8px !important; min-height: 8px !important; background-color: #e9ecef ; margin-bottom: 2px ;">
                         <div class="energy-bar" style="width: ${energy}%; height: 8px !important; min-height: 8px !important;" title="Test Energy: ${energy}%"></div>
@@ -747,17 +794,8 @@ function populateFilterDropdowns() {
     const artists = [...new Set(songs.map(song => song.artist).filter(Boolean))].sort();
     const albums = [...new Set(songs.map(song => song.album).filter(Boolean))].sort();
     
-    // Extract folder paths from file_path using the same logic as getFolder function
-    const folders = [...new Set(songs.map(song => {
-        if (song.file_path) {
-            const parts = song.file_path.split('/');
-            if (parts.length > 1) {
-                parts.pop(); // Remove filename
-                return parts[parts.length - 1]; // Return last folder name
-            }
-        }
-        return null;
-    }).filter(Boolean))].sort();
+    // Use server-provided folder information
+    const folders = [...new Set(songs.map(song => song.folder).filter(Boolean))].sort();
     
     const artistSelect = document.getElementById('artistFilter');
     const albumSelect = document.getElementById('albumFilter');
@@ -820,18 +858,8 @@ function applyFilters() {
         const matchesArtist = !selectedArtist || song.artist === selectedArtist;
         const matchesAlbum = !selectedAlbum || song.album === selectedAlbum;
         
-        // Check if song is in the selected folder using the same logic as getFolder
-        const matchesFolder = !selectedFolder || (() => {
-            if (song.file_path) {
-                const parts = song.file_path.split('/');
-                if (parts.length > 1) {
-                    parts.pop(); // Remove filename
-                    const folderName = parts[parts.length - 1]; // Get last folder name
-                    return folderName === selectedFolder;
-                }
-            }
-            return false;
-        })();
+        // Check if song is in the selected folder using server-provided folder field
+        const matchesFolder = !selectedFolder || song.folder === selectedFolder;
         
         // Energy filter
         let matchesEnergy = true;
@@ -2372,7 +2400,7 @@ async function applyBatchPlaylist() {
         
         // Clear selection
         selectedSongs.clear();
-        updateBatchActionsVisibility();
+        updateBatchActionsDisplay();
         
         // Update checkboxes
         document.querySelectorAll('.song-checkbox').forEach(cb => cb.checked = false);
@@ -2409,7 +2437,7 @@ async function batchDeleteSongs() {
     
     // Clear selection
     selectedSongs.clear();
-    updateBatchActionsVisibility();
+    updateBatchActionsDisplay();
     
     // Show undo notification
     showUndoNotification('Songs will be deleted in 5 seconds', () => undoBatchDelete());
@@ -2587,6 +2615,96 @@ async function scanLibrary() {
         notificationSystem.dismiss(processingNotification);
         notificationSystem.error('Scan Failed', 'Failed to scan library. Please check your connection.');
         console.error('Error scanning library:', error);
+    }
+}
+
+// Rescan Functions
+function openRescanModal() {
+    if (selectedSongs.size === 0) {
+        alert('No songs selected');
+        return;
+    }
+    
+    // Update the info text
+    document.getElementById('rescanInfo').textContent = `${selectedSongs.size} song(s) selected for rescanning`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('rescanModal'));
+    modal.show();
+}
+
+async function applyRescan() {
+    if (selectedSongs.size === 0) {
+        alert('No songs selected');
+        return;
+    }
+    
+    // Get selected mode
+    const mode = document.querySelector('input[name="rescanMode"]:checked').value;
+    const songIds = Array.from(selectedSongs);
+    
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('rescanModal'));
+    modal.hide();
+    
+    // Show processing notification
+    const processingNotification = notificationSystem.info(
+        'Rescanning Songs', 
+        `Rescanning ${songIds.length} song(s) with ${mode} mode...`,
+        { duration: 0 }
+    );
+    
+    try {
+        const response = await fetch('/api/songs/rescan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                song_ids: songIds,
+                mode: mode
+            })
+        });
+        
+        // Dismiss processing notification
+        notificationSystem.dismiss(processingNotification);
+        
+        if (response.ok) {
+            const result = await response.json();
+            const updated = result.updated || 0;
+            const errors = result.errors || [];
+            
+            let message = `Rescan complete! Updated ${updated} song(s).`;
+            if (errors.length > 0) {
+                message += ` ${errors.length} errors occurred.`;
+            }
+            
+            if (updated > 0) {
+                notificationSystem.success('Rescan Complete', message);
+                // Reload the songs table to show updated metadata
+                loadSongs();
+                // Clear selection
+                selectedSongs.clear();
+                updateBatchActionsDisplay();
+            } else {
+                notificationSystem.warning('Rescan Complete', message);
+            }
+            
+            // Show errors if any
+            if (errors.length > 0) {
+                console.warn('Rescan errors:', errors);
+            }
+        } else {
+            const errorText = await response.text();
+            notificationSystem.error(
+                'Rescan Failed', 
+                `Failed to rescan songs. ${response.status}: ${errorText}`
+            );
+        }
+    } catch (error) {
+        // Dismiss processing notification
+        notificationSystem.dismiss(processingNotification);
+        notificationSystem.error('Rescan Failed', 'Failed to rescan songs. Please check your connection.');
+        console.error('Error rescanning songs:', error);
     }
 }
 </script>

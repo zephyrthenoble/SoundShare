@@ -7,8 +7,12 @@ import re
 import os
 from typing import Dict, List, Tuple, Optional
 import soundfile as sf
+import traceback
+
+from mutagen import MutagenError
 
 from mutagen import File as MutagenFile
+
 from mutagen.id3 import ID3NoHeaderError
 MUTAGEN_AVAILABLE = True
 
@@ -87,26 +91,26 @@ class AudioAnalyzer:
         metadata = {}
         
         try:
-            if MUTAGEN_AVAILABLE:
-                try:
-                    audio_file = MutagenFile(file_path)
-                    if audio_file is not None:
-                        # Extract common tags
-                        metadata.update(self._extract_common_tags(audio_file))
-                        
-                        # Get duration
-                        if hasattr(audio_file, 'info') and hasattr(audio_file.info, 'length'):
-                            metadata['duration'] = float(audio_file.info.length)
-                except Exception as mutagen_error:
-                    print(f"Warning: Mutagen failed to read {file_path}: {mutagen_error}")
-                    # Continue with filename parsing even if mutagen fails
+            
+            try:
+                audio_file = MutagenFile(file_path)
+                if audio_file is not None:
+                    # Extract common tags
+                    metadata.update(self._extract_common_tags(audio_file))
+                    
+                    # Get duration
+                    if hasattr(audio_file, 'info') and hasattr(audio_file.info, 'length'):
+                        metadata['duration'] = float(audio_file.info.length)
+            except MutagenError:
+                print(f"Warning: Mutagen failed to read {file_path}: {traceback.format_exc()}")
+                # Continue with filename parsing even if mutagen fails
                         
             # Parse filename for track number and clean title
             filename_info = self._parse_filename(file_path)
             metadata.update(filename_info)
             
         except Exception as e:
-            print(f"Error extracting metadata from {file_path}: {e}")
+            print(f"Error extracting metadata from {file_path}: {traceback.format_exc()}")
             # Return basic info from filename even if everything else fails
             metadata = self._parse_filename(file_path)
             
@@ -118,6 +122,15 @@ class AudioAnalyzer:
         
         # Common tag mappings for different formats
         tag_mappings = {
+            # musicbrainz
+            'title': 'title',
+            'artists': 'artist',
+            'album': 'album',
+            'date': 'year',
+            'genre': 'genre',
+            'track': 'track',
+            'albumartist': 'albumartist',
+
             # ID3 tags (MP3)
             'TIT2': 'title',
             'TPE1': 'artist', 
@@ -147,31 +160,35 @@ class AudioAnalyzer:
         }
         
         for tag_key, meta_key in tag_mappings.items():
-            if tag_key in audio_file:
-                value = audio_file[tag_key]
-                if isinstance(value, list) and value:
-                    value = value[0]
-                
-                # Special handling for track numbers
-                if meta_key == 'track':
-                    if hasattr(value, 'text'):
-                        value = value.text[0] if value.text else None
-                    if isinstance(value, tuple):
-                        value = value[0]  # Get track number from (track, total) tuple
-                    if value:
-                        try:
-                            # Extract just the track number
-                            track_str = str(value).split('/')[0]
-                            metadata[meta_key] = int(track_str)
-                        except (ValueError, IndexError):
-                            pass
-                else:
-                    # Handle text values
-                    if hasattr(value, 'text'):
-                        value = value.text[0] if value.text else str(value)
-                    
-                    metadata[meta_key] = str(value).strip()
-        
+            try:
+                if tag_key in audio_file:
+                    print(tag_key, meta_key)
+                    value = audio_file[tag_key]
+                    if isinstance(value, list) and value:
+                        value = ", ".join([str(v) for v in value if v])
+
+                    # Special handling for track numbers
+                    if meta_key == 'track':
+                        if hasattr(value, 'text'):
+                            value = value.text[0] if value.text else None
+                        if isinstance(value, tuple):
+                            value = value[0]  # Get track number from (track, total) tuple
+                        if value:
+                            try:
+                                # Extract just the track number
+                                track_str = str(value).split('/')[0]
+                                metadata[meta_key] = int(track_str)
+                            except (ValueError, IndexError):
+                                pass
+                    else:
+                        # Handle text values
+                        if hasattr(value, 'text'):
+                            value = value.text[0] if value.text else str(value)
+                        
+                        metadata[meta_key] = str(value).strip()
+            except ValueError:
+                pass
+
         return metadata
     
     def _parse_filename(self, file_path: str) -> Dict:
