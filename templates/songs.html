@@ -4,7 +4,10 @@
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h1>Song Management</h1>
+    <div class="d-flex align-items-center">
+        <h1 class="me-3">Song Management</h1>
+        <span class="badge bg-secondary fs-6" id="filteredSongCount">0 songs</span>
+    </div>
     <button class="btn btn-warning" id="scanLibraryBtn">
         <i class="fas fa-search"></i> Scan Library
     </button>
@@ -14,13 +17,13 @@
 <div class="card mb-4">
     <div class="card-body">
         <div class="row">
-            <div class="col-md-4">
+            <div class="col-md-3">
                 <div class="mb-3">
                     <label for="searchInput" class="form-label">Search Songs</label>
                     <input type="text" class="form-control" id="searchInput" placeholder="Search by name, artist, album...">
                 </div>
             </div>
-            <div class="col-md-3">
+            <div class="col-md-2">
                 <div class="mb-3">
                     <label for="artistFilter" class="form-label">Filter by Artist</label>
                     <select class="form-select" id="artistFilter">
@@ -41,6 +44,19 @@
                     <label for="folderFilter" class="form-label">Filter by Folder</label>
                     <select class="form-select" id="folderFilter">
                         <option value="">All Folders</option>
+                    </select>
+                </div>
+            </div>
+            <div class="col-md-2">
+                <div class="mb-3">
+                    <label for="tempoFilter" class="form-label">Filter by Tempo</label>
+                    <select class="form-select" id="tempoFilter">
+                        <option value="">All Tempos</option>
+                        <option value="slow">Slow (60-90 BPM)</option>
+                        <option value="moderate">Moderate (90-120 BPM)</option>
+                        <option value="medium">Medium (120-140 BPM)</option>
+                        <option value="fast">Fast (140-180 BPM)</option>
+                        <option value="very-fast">Very Fast (180+ BPM)</option>
                     </select>
                 </div>
             </div>
@@ -102,22 +118,11 @@
                 </div>
             </div>
         </div>
-        
-        <div class="row">
-            <div class="col-md-12">
-                <div class="mb-3">
-                    <label class="form-label">Song Count</label>
-                    <div>
-                        <span class="btn btn-outline-info w-100" id="filteredSongCount">0 songs</span>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 </div>
 
 <!-- Batch Actions Section -->
-<div class="card mb-4" id="batchActionsCard" style="display: none;">
+<div class="card mb-4" id="batchActionsCard">
     <div class="card-body">
         <div class="row align-items-center">
             <div class="col-md-4">
@@ -125,16 +130,16 @@
             </div>
             <div class="col-md-8">
                 <div class="btn-group">
-                    <button class="btn btn-success" onclick="openBatchTagModal()">
+                    <button class="btn btn-success" id="batchTagBtn" onclick="openBatchTagModal()" disabled>
                         <i class="fas fa-tags"></i> Batch Tag
                     </button>
-                    <button class="btn btn-primary" onclick="openBatchPlaylistModal()">
+                    <button class="btn btn-primary" id="batchPlaylistBtn" onclick="openBatchPlaylistModal()" disabled>
                         <i class="fas fa-list"></i> Add to Playlist
                     </button>
-                    <button class="btn btn-info" onclick="openRescanModal()">
+                    <button class="btn btn-info" id="batchRescanBtn" onclick="openRescanModal()" disabled>
                         <i class="fas fa-sync-alt"></i> Rescan
                     </button>
-                    <button class="btn btn-danger" onclick="batchDeleteSongs()">
+                    <button class="btn btn-danger" id="batchDeleteBtn" onclick="batchDeleteSongs()" disabled>
                         <i class="fas fa-trash"></i> Delete Selected
                     </button>
                     <button class="btn btn-outline-primary" onclick="selectAll()">
@@ -161,11 +166,21 @@
                             <th width="50">
                                 <input type="checkbox" id="selectAllCheckbox" onchange="toggleSelectAll()">
                             </th>
-                            <th width="250">Name</th>
-                            <th width="140">Folder</th>
-                            <th width="160">Album</th>
-                            <th width="80">Track #</th>
-                            <th width="80">Duration</th>
+                            <th width="250" style="cursor: pointer;" onclick="sortTable('display_name')">
+                                Name <i class="fas fa-sort" id="sort-display_name"></i>
+                            </th>
+                            <th width="140" style="cursor: pointer;" onclick="sortTable('folder')">
+                                Folder <i class="fas fa-sort" id="sort-folder"></i>
+                            </th>
+                            <th width="160" style="cursor: pointer;" onclick="sortTable('album')">
+                                Album <i class="fas fa-sort" id="sort-album"></i>
+                            </th>
+                            <th width="80" style="cursor: pointer;" onclick="sortTable('duration')">
+                                Duration <i class="fas fa-sort" id="sort-duration"></i>
+                            </th>
+                            <th width="100" style="cursor: pointer;" onclick="sortTable('tempo')">
+                                Tempo <i class="fas fa-sort" id="sort-tempo"></i>
+                            </th>
                             <th width="180">Mood</th>
                         </tr>
                     </thead>
@@ -179,79 +194,6 @@
 </div>
 
 
-<!-- Add Single File Modal -->
-<div class="modal fade" id="addFileModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add Single Song</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <form id="addFileForm">
-                    <div class="mb-3">
-                        <label for="filePath" class="form-label">File Path</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="filePath" placeholder="/path/to/your/song.mp3" required>
-                            <input type="file" class="form-control d-none" id="filePathInput" accept="audio/*">
-                            <button type="button" class="btn btn-outline-secondary" onclick="selectAudioFile()">
-                                <i class="fas fa-folder-open"></i> Browse
-                            </button>
-                        </div>
-                        <div class="form-text">Select an audio file from your system</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="displayName" class="form-label">Display Name (Optional)</label>
-                        <input type="text" class="form-control" id="displayName" placeholder="Leave empty to use filename">
-                    </div>
-                </form>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" onclick="addSingleSong()">Add Song</button>
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Add Multiple Files Modal -->
-<div class="modal fade" id="addMultipleModal" tabindex="-1">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add Multiple Songs</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="filePathsList" class="form-label">File Paths</label>
-                    <div class="mb-2">
-                        <input type="file" class="form-control d-none" id="multipleFilesInput" multiple accept="audio/*">
-                        <button type="button" class="btn btn-outline-info" onclick="selectMultipleAudioFiles()">
-                            <i class="fas fa-folder-open"></i> Select Audio Files
-                        </button>
-                        <small class="text-muted ms-2">or enter paths manually below</small>
-                    </div>
-                    <textarea class="form-control" id="filePathsList" rows="10" 
-                              placeholder="Enter one file path per line, e.g.:
-/path/to/song1.mp3
-/path/to/song2.wav
-/path/to/song3.flac"></textarea>
-                    <div class="form-text">Select multiple audio files or enter one file path per line. Supported formats: MP3, WAV, FLAC, M4A, OGG, WMA</div>
-                </div>
-                <div class="mb-3">
-                    <button type="button" class="btn btn-outline-info" onclick="loadSamplePaths()">
-                        <i class="fas fa-lightbulb"></i> Load Example Paths
-                    </button>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-success" onclick="addMultipleSongs()">Add All Songs</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <!-- Scan Directory Modal -->
 <div class="modal fade" id="scanDirectoryModal" tabindex="-1">
@@ -637,6 +579,17 @@ let playlists = [];
 let selectedSongs = new Set();
 let batchSelectedTags = new Set();
 
+// Sorting state
+let currentSortColumn = '';
+let currentSortDirection = 'asc';
+
+// Expanded song tracking
+let expandedSongId = null;
+let expandedSongRow = null;
+
+// Global timeout tracking for cleanup
+window.songTimeouts = [];
+
 // Undo functionality
 let undoTimeout = null;
 let deletedSong = null;
@@ -699,6 +652,53 @@ function populatePlaylistDropdown() {
     });
 }
 
+function sortTable(column) {
+    // Toggle sort direction if same column, otherwise set to ascending
+    if (currentSortColumn === column) {
+        currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        currentSortColumn = column;
+        currentSortDirection = 'asc';
+    }
+    
+    // Update sort icons
+    document.querySelectorAll('[id^="sort-"]').forEach(icon => {
+        icon.className = 'fas fa-sort';
+    });
+    
+    const sortIcon = document.getElementById(`sort-${column}`);
+    if (sortIcon) {
+        sortIcon.className = currentSortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+    }
+    
+    // Sort the filteredSongs array
+    filteredSongs.sort((a, b) => {
+        let aVal = a[column];
+        let bVal = b[column];
+        
+        // Handle null/undefined values
+        if (aVal == null && bVal == null) return 0;
+        if (aVal == null) return 1;
+        if (bVal == null) return -1;
+        
+        // Convert to string for comparison, except for numbers
+        if (column === 'tempo' || column === 'duration' || column === 'track_number' || column === 'year') {
+            aVal = parseFloat(aVal) || 0;
+            bVal = parseFloat(bVal) || 0;
+        } else {
+            aVal = String(aVal).toLowerCase();
+            bVal = String(bVal).toLowerCase();
+        }
+        
+        if (aVal < bVal) return currentSortDirection === 'asc' ? -1 : 1;
+        if (aVal > bVal) return currentSortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    // Re-render the table
+    renderSongsTable();
+}
+
 function renderSongsTable() {
     const tbody = document.querySelector('#songsTable tbody');
     tbody.innerHTML = '';
@@ -758,8 +758,8 @@ function renderSongsTable() {
             <td class="song-name-cell" title="${song.display_name}" style="max-width: 250px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.display_name}</td>
             <td class="song-folder-cell" title="${song.folder || ''}" style="max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><small class="text-muted">${song.folder || ''}</small></td>
             <td class="song-album-cell" title="${song.album || ''}" style="max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.album || ''}</td>
-            <td class="song-track-cell">${song.track_number || ''}</td>
             <td><small>${formatDuration(song.duration)}</small></td>
+            <td><small>${song.tempo ? Math.round(song.tempo) + ' BPM' : ''}</small></td>
             <td style="padding: 4px; height: 40px; vertical-align: middle;">
                 <div class="mood-bars" title="Test: Energy: ${energy}% | Valence: ${valence}% | Danceability: ${danceability}%" style="height: 32px !important; min-height: 32px !important; display: flex !important; flex-direction: column !important;">
                     <div class="mood-bar-container" style="height: 8px !important; min-height: 8px !important; background-color: #e9ecef ; margin-bottom: 2px ;">
@@ -822,6 +822,7 @@ function setupFilterListeners() {
     const artistFilter = document.getElementById('artistFilter');
     const albumFilter = document.getElementById('albumFilter');
     const folderFilter = document.getElementById('folderFilter');
+    const tempoFilter = document.getElementById('tempoFilter');
     const energyFilter = document.getElementById('energyFilter');
     const valenceFilter = document.getElementById('valenceFilter');
     const danceabilityFilter = document.getElementById('danceabilityFilter');
@@ -831,6 +832,7 @@ function setupFilterListeners() {
     artistFilter.addEventListener('change', applyFilters);
     albumFilter.addEventListener('change', applyFilters);
     folderFilter.addEventListener('change', applyFilters);
+    tempoFilter.addEventListener('change', applyFilters);
     energyFilter.addEventListener('change', applyFilters);
     valenceFilter.addEventListener('change', applyFilters);
     danceabilityFilter.addEventListener('change', applyFilters);
@@ -842,6 +844,7 @@ function applyFilters() {
     const selectedArtist = document.getElementById('artistFilter').value;
     const selectedAlbum = document.getElementById('albumFilter').value;
     const selectedFolder = document.getElementById('folderFilter').value;
+    const selectedTempo = document.getElementById('tempoFilter').value;
     const selectedEnergy = document.getElementById('energyFilter').value;
     const selectedValence = document.getElementById('valenceFilter').value;
     const selectedDanceability = document.getElementById('danceabilityFilter').value;
@@ -860,6 +863,17 @@ function applyFilters() {
         
         // Check if song is in the selected folder using server-provided folder field
         const matchesFolder = !selectedFolder || song.folder === selectedFolder;
+        
+        // Tempo filter
+        let matchesTempo = true;
+        if (selectedTempo && song.tempo !== null && song.tempo !== undefined) {
+            const tempo = song.tempo;
+            if (selectedTempo === 'slow' && (tempo < 60 || tempo >= 90)) matchesTempo = false;
+            if (selectedTempo === 'moderate' && (tempo < 90 || tempo >= 120)) matchesTempo = false;
+            if (selectedTempo === 'medium' && (tempo < 120 || tempo >= 140)) matchesTempo = false;
+            if (selectedTempo === 'fast' && (tempo < 140 || tempo >= 180)) matchesTempo = false;
+            if (selectedTempo === 'very-fast' && tempo < 180) matchesTempo = false;
+        }
         
         // Energy filter
         let matchesEnergy = true;
@@ -896,7 +910,7 @@ function applyFilters() {
             if (selectedDuration === 'long' && song.duration < 60) matchesDuration = false;
         }
         
-        return matchesSearch && matchesArtist && matchesAlbum && matchesFolder && 
+        return matchesSearch && matchesArtist && matchesAlbum && matchesFolder && matchesTempo &&
                matchesEnergy && matchesValence && matchesDanceability && matchesDuration;
     });
     
@@ -917,6 +931,7 @@ function clearFilters() {
     document.getElementById('artistFilter').value = '';
     document.getElementById('albumFilter').value = '';
     document.getElementById('folderFilter').value = '';
+    document.getElementById('tempoFilter').value = '';
     document.getElementById('energyFilter').value = '';
     document.getElementById('valenceFilter').value = '';
     document.getElementById('danceabilityFilter').value = '';
@@ -996,15 +1011,22 @@ function updateSelectAllCheckbox() {
 }
 
 function updateBatchActionsDisplay() {
-    const batchActionsCard = document.getElementById('batchActionsCard');
     const selectedCount = document.getElementById('selectedCount');
+    const batchTagBtn = document.getElementById('batchTagBtn');
+    const batchPlaylistBtn = document.getElementById('batchPlaylistBtn');
+    const batchRescanBtn = document.getElementById('batchRescanBtn');
+    const batchDeleteBtn = document.getElementById('batchDeleteBtn');
     
-    if (selectedSongs.size > 0) {
-        batchActionsCard.style.display = 'block';
-        selectedCount.textContent = `${selectedSongs.size} song${selectedSongs.size === 1 ? '' : 's'} selected`;
-    } else {
-        batchActionsCard.style.display = 'none';
-    }
+    const hasSelection = selectedSongs.size > 0;
+    
+    // Update selected count text
+    selectedCount.textContent = `${selectedSongs.size} song${selectedSongs.size === 1 ? '' : 's'} selected`;
+    
+    // Enable/disable buttons based on selection
+    batchTagBtn.disabled = !hasSelection;
+    batchPlaylistBtn.disabled = !hasSelection;
+    batchRescanBtn.disabled = !hasSelection;
+    batchDeleteBtn.disabled = !hasSelection;
     
     updateSelectAllCheckbox();
 }
@@ -1473,6 +1495,43 @@ async function updateSong() {
 }
 
 async function previewSong(songId, rowElement) {
+    // Check if clicking on the already expanded row
+    if (expandedSongId === songId) {
+        // Close the expanded row
+        stopAllAudio();
+        
+        // Remove the preview row
+        const existingPreview = document.querySelectorAll('.song-preview-row');
+        existingPreview.forEach(preview => {
+            // Stop any audio in the existing preview before removing
+            const audioElements = preview.querySelectorAll('audio');
+            audioElements.forEach(audio => {
+                audio.pause();
+                audio.src = '';
+                if (audio.autoPlayNext) {
+                    audio.removeEventListener('ended', audio.autoPlayNext);
+                    audio.autoPlayNext = null;
+                }
+                if (audio.onSongEnd) {
+                    audio.removeEventListener('ended', audio.onSongEnd);
+                    audio.onSongEnd = null;
+                }
+            });
+            preview.remove();
+        });
+        
+        // Reset expanded state
+        expandedSongId = null;
+        expandedSongRow = null;
+        
+        // Remove highlighting from the row
+        if (rowElement) {
+            rowElement.classList.remove('table-secondary');
+        }
+        
+        return;
+    }
+    
     // Stop all currently playing audio in the entire page
     stopAllAudio();
     
@@ -1495,6 +1554,20 @@ async function previewSong(songId, rowElement) {
         });
         preview.remove();
     });
+    
+    // Remove highlighting from previous expanded row
+    if (expandedSongRow) {
+        expandedSongRow.classList.remove('table-secondary');
+    }
+    
+    // Set new expanded state
+    expandedSongId = songId;
+    expandedSongRow = rowElement;
+    
+    // Highlight the current row
+    if (rowElement) {
+        rowElement.classList.add('table-secondary');
+    }
     
     // Get song data for this row
     const song = filteredSongs.find(s => s.id === songId);
@@ -1530,6 +1603,10 @@ async function previewSong(songId, rowElement) {
                                 <div><strong>Filename:</strong> ${song.filename || 'Unknown'}</div>
                                 <div><strong>Artist:</strong> ${song.artist || 'Unknown'}</div>
                                 <div><strong>Year:</strong> ${song.year || 'Unknown'}</div>
+                                <div><strong>Track #:</strong> ${song.track_number || 'Unknown'}</div>
+                                <div><strong>Tempo:</strong> ${song.tempo ? Math.round(song.tempo) + ' BPM' : 'Unknown'}</div>
+                                <div><strong>Key:</strong> ${song.key || 'Unknown'}</div>
+                                <div><strong>File Size:</strong> ${song.file_size ? Math.round(song.file_size / 1024) + ' KB' : 'Unknown'}</div>
                             </div>
                             <div class="mt-2">
                                 <div class="d-flex align-items-center mb-2">
@@ -1744,6 +1821,14 @@ function stopAllAudio() {
         btn.classList.remove('btn-success', 'btn-primary');
         btn.classList.add('btn-outline-primary');
     });
+    
+    // Clear any global timeouts that might be scheduled
+    if (window.songTimeouts) {
+        window.songTimeouts.forEach(timeoutId => {
+            clearTimeout(timeoutId);
+        });
+        window.songTimeouts = [];
+    }
 }
 
 // Handler for seeking during auto-play mode
