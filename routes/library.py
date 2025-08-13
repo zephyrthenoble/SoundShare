@@ -18,14 +18,16 @@ templates = Jinja2Templates(directory="src/soundshare/templates")
 class AddSongRequest(BaseModel):
     path: str
     
-class AddSongsRequest(BaseModel):
-    songs: List[str]
+
 
 class AddScanDirectoriesRequest(BaseModel):
     paths: List[str]
 
 class RemoveScanDirectoriesRequest(BaseModel):
     paths: List[str]
+
+class RemoveScanDirectoriesByIdRequest(BaseModel):
+    ids: List[int]
 
 class RemoveSongRequest(BaseModel):
     id: int
@@ -117,8 +119,8 @@ async def browse_library(path: str = "", db: Session = Depends(get_db)):
     
     # Get existing songs and scanned directories for validation
     try:
-        existing_songs = {song.file_path for song in db.query(Song).all()}
-        existing_dirs = {dir.directory_path for dir in db.query(ScannedDirectory).all()}
+        existing_songs = {song.file_path: song.id for song in db.query(Song).all()}
+        existing_dirs = {dir.directory_path: dir.id for dir in db.query(ScannedDirectory).all()}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
     
@@ -140,7 +142,8 @@ async def browse_library(path: str = "", db: Session = Depends(get_db)):
                         "name": item.name,
                         "path": relative_path,
                         "full_path": full_path,
-                        "already_added": full_path in existing_dirs
+                        "already_added": full_path in existing_dirs,
+                        "id": existing_dirs.get(full_path)
                     })
                 elif item.is_file() and item.suffix.lower() in AUDIO_EXTENSIONS:
                     items.append({
@@ -148,7 +151,8 @@ async def browse_library(path: str = "", db: Session = Depends(get_db)):
                         "name": item.name,
                         "path": relative_path,
                         "full_path": full_path,
-                        "already_added": full_path in existing_songs
+                        "already_added": full_path in existing_songs,
+                        "id": existing_songs.get(full_path)
                     })
             except Exception as e:
                 # Skip items that cause errors but don't fail the whole request
@@ -264,6 +268,34 @@ async def remove_scan_directories(request: RemoveScanDirectoriesRequest, db: Ses
     
     db.commit()
     return {"message": f"Removed {removed_count} directories"}
+
+@router.post("/directory/remove-by-id")
+async def remove_scan_directories_by_id(request: RemoveScanDirectoriesByIdRequest, db: Session = Depends(get_db)):
+    """Remove directories from scan list by ID (more reliable than paths)"""
+    removed_count = 0
+    removed_paths = []
+    errors = []
+    
+    if len(request.ids) == 0:
+        raise HTTPException(status_code=400, detail="No directory IDs provided")
+    
+    print(f"Removing directories by ID: {request.ids}")
+    
+    for dir_id in request.ids:
+        scan_dir = db.query(ScannedDirectory).filter(ScannedDirectory.id == dir_id).first()
+        if scan_dir:
+            removed_paths.append(scan_dir.directory_path)  # Store path for undo
+            db.delete(scan_dir)
+            removed_count += 1
+            print(f"Removed directory ID {dir_id}: {scan_dir.directory_path}")
+        else:
+            errors.append(f"Directory not found with ID: {dir_id}")
+            print(f"Directory not found with ID: {dir_id}")
+    
+    db.commit()
+    print(f"Removed directories: {removed_count}")
+    print(f"Errors: {errors}")
+    return {"message": f"Removed {removed_count} directories", "removed": removed_count, "errors": errors, "removed_paths": removed_paths}
 
 @router.post("/scan")
 async def scan_directories(request: ScanDirectoriesRequest, db: Session = Depends(get_db)):

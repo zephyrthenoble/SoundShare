@@ -168,7 +168,9 @@ class FileBrowser {
             const isChecked = this.selectedItems.has(item.full_path);
             const icon = item.type === 'directory' ? 'fa-folder' : 'fa-file-audio';
             const alreadyAddedBadge = item.already_added ? 
-                '<span class="badge bg-secondary ms-2">Already Added</span>' : '';
+                `<button class="btn btn-sm btn-outline-danger ms-2" onclick="removeFromSystem(${item.id}, '${item.type}', '${item.name}', this)" title="Remove from system">
+                    <i class="fas fa-times"></i> Remove
+                </button>` : '';
             
             html += `
                 <div class="list-group-item d-flex align-items-center">
@@ -308,6 +310,167 @@ class FileBrowser {
      */
     initializePage() {
         this.loadDirectory();
+    }
+}
+
+// Global function to remove items from system
+async function removeFromSystem(itemId, itemType, itemName, buttonElement) {
+    const isDirectory = itemType === 'directory';
+    console.log(`Removing ${itemType} with ID: ${itemId}, Name: ${itemName}`);
+    
+    // Show processing notification
+    const processingNotification = notificationSystem.info(
+        'Removing Item', 
+        `Removing ${isDirectory ? 'directory' : 'song'} "${itemName}" from your library...`,
+        { duration: 0 }
+    );
+    
+    try {
+        let response;
+        
+        if (isDirectory) {
+            // Remove directory from scan list by ID
+            response = await fetch('/api/library/directory/remove-by-id', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ ids: [itemId] })
+            });
+        } else {
+            // Remove song from library by ID
+            response = await fetch('/api/songs/remove-by-id', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ ids: [itemId] })
+            });
+        }
+        
+        // Dismiss processing notification
+        notificationSystem.dismiss(processingNotification);
+        
+        if (response.ok) {
+            const result = await response.json();
+            const removed = result.removed || 0;
+            const errors = result.errors || [];
+            const removedPaths = result.removed_paths || [];
+
+            console.log(`Remove result:`, result);
+
+            if (errors.length > 0) {
+                // Show error notification
+                notificationSystem.error(
+                    'Remove Failed',
+                    `Failed to remove ${isDirectory ? 'directory' : 'song'}. ${errors.join(', ')}`
+                );
+            }
+            
+            if (removed > 0) {
+                // Show success notification with undo option
+                notificationSystem.undo(
+                    `${isDirectory ? 'Directory' : 'Song'} Removed`,
+                    `Successfully removed "${itemName}" from your ${isDirectory ? 'scan list' : 'library'}.`,
+                    undoRemoveFromSystem,
+                    () => {
+                        // On undo timeout, refresh the file browser
+                        if (window.pageBrowser) {
+                            window.pageBrowser.loadDirectory();
+                        }
+                    },
+                    5,
+                    { paths: removedPaths, type: itemType, name: itemName }
+                );
+            }
+            
+            // Hide the button and refresh the directory
+            if (buttonElement) {
+                buttonElement.style.display = 'none';
+            }
+            
+            // Refresh the file browser to show updated state
+            if (window.pageBrowser) {
+                window.pageBrowser.loadDirectory();
+            }
+            
+        } else {
+            const errorText = await response.text();
+            notificationSystem.error(
+                'Remove Failed', 
+                `Failed to remove ${isDirectory ? 'directory' : 'song'}. ${response.status}: ${errorText}`
+            );
+        }
+    } catch (error) {
+        // Dismiss processing notification
+        notificationSystem.dismiss(processingNotification);
+        notificationSystem.error('Remove Failed', `Failed to remove ${isDirectory ? 'directory' : 'song'}. Please check your connection.`);
+        console.error('Error removing item:', error);
+    }
+}
+
+// Global function to undo removal from system
+async function undoRemoveFromSystem(itemData) {
+    const { paths, type, name } = itemData;
+    const isDirectory = type === 'directory';
+    
+    console.log(`Undoing remove for ${type}:`, paths);
+    
+    // Show processing notification
+    const processingNotification = notificationSystem.info(
+        'Restoring Item', 
+        `Restoring ${isDirectory ? 'directory' : 'song'} "${name}" to your ${isDirectory ? 'scan list' : 'library'}...`,
+        { duration: 0 }
+    );
+    
+    try {
+        let response;
+        
+        if (isDirectory) {
+            // Re-add directory to scan list
+            response = await fetch('/api/library/directory/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ paths: paths })
+            });
+        } else {
+            // Re-add song to library
+            response = await fetch('/api/songs/add', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ songs: paths })
+            });
+        }
+        
+        // Dismiss processing notification
+        notificationSystem.dismiss(processingNotification);
+        
+        if (response.ok) {
+            notificationSystem.success(
+                'Restore Successful', 
+                `Successfully restored "${name}" to your ${isDirectory ? 'scan list' : 'library'}.`
+            );
+            
+            // Refresh the file browser to show updated state
+            if (window.pageBrowser) {
+                window.pageBrowser.loadDirectory();
+            }
+        } else {
+            const errorText = await response.text();
+            notificationSystem.error(
+                'Restore Failed', 
+                `Failed to restore ${isDirectory ? 'directory' : 'song'}. ${response.status}: ${errorText}`
+            );
+        }
+    } catch (error) {
+        // Dismiss processing notification
+        notificationSystem.dismiss(processingNotification);
+        notificationSystem.error('Restore Failed', `Failed to restore ${isDirectory ? 'directory' : 'song'}. Please check your connection.`);
+        console.error('Error restoring item:', error);
     }
 }
 

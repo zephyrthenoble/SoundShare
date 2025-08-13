@@ -1,215 +1,671 @@
 {% extends "base.html" %}
+
 {% block title %}Library - SoundShare{% endblock %}
+
 {% block content %}
+
 <div class="d-flex justify-content-between align-items-center mb-4">
   <h1>Library</h1>
-  <div class="btn-group">
-    <a href="/library/add-songs" class="btn btn-primary"><i class="fas fa-plus"></i> Add Songs</a>
-    <a href="/library/add-scan-directories" class="btn btn-info"><i class="fas fa-folder-plus"></i> Add Scan Directories</a>
-  </div>
 </div>
-<div class="row">
-  <div class="col-lg-6 mb-4">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <div>
-          <h5 class="mb-0">Added Songs</h5>
-          <small class="text-muted">Songs explicitly added (not via path scan)</small>
+<div class="container-fluid mt-4">
+    <!-- File Browser Container -->
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Browse Files and Directories</h5>
+                    <div>
+                        <button class="btn btn-sm btn-warning me-2" id="scanLibraryBtn">
+                            <i class="fas fa-search"></i> Scan Library
+                        </button>
+                        <button class="btn btn-sm btn-outline-secondary" id="refreshBtn">
+                            <i class="fas fa-refresh"></i> Refresh
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body d-flex flex-column" style="height: 70vh;">
+                    <!-- Breadcrumb Navigation -->
+                    <nav aria-label="breadcrumb" class="mb-3">
+                        <ol class="breadcrumb mb-0" id="breadcrumb"></ol>
+                    </nav>
+                    
+                    <!-- File Browser Content -->
+                    <div class="row flex-grow-1">
+                        <div class="col-8 border-end d-flex flex-column">
+                            <div id="fileList" class="flex-grow-1 overflow-auto"></div>
+                        </div>
+                        <div class="col-4 d-flex flex-column">
+                            <!-- Selection Summary -->
+                            <div class="mb-3">
+                                <h6>Selected Items</h6>
+                                <div class="small text-muted">
+                                    Songs: <span id="selectedSongsCount" class="fw-bold text-primary">0</span> |
+                                    Directories: <span id="selectedDirsCount" class="fw-bold text-success">0</span>
+                                </div>
+                            </div>
+
+                            <!-- Action Buttons -->
+                            <div class="d-grid gap-2 mb-3">
+                                <button class="btn btn-primary" id="addSongsBtn" disabled>
+                                    <i class="fas fa-music"></i> Add <span id="songsButtonCount">0</span> Songs
+                                </button>
+                                <button class="btn btn-success" id="addDirectoriesBtn" disabled>
+                                    <i class="fas fa-folder"></i> Scan <span id="dirsButtonCount">0</span> Directories
+                                </button>
+                                <button class="btn btn-outline-primary" id="addAllBtn" disabled>
+                                    <i class="fas fa-plus"></i> Add All Selected
+                                </button>
+                            </div>
+
+                            <!-- Selected Items List -->
+                            <div id="selectedList" class="flex-grow-1 overflow-auto border rounded p-2 bg-light"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-secondary" id="manualCount">0</span>
-          <a href="/library/add-songs" class="btn btn-sm btn-outline-primary" title="Add Songs"><i class="fas fa-plus"></i></a>
-        </div>
-      </div>
-      <div class="card-body p-0">
-        <table class="table table-sm mb-0">
-          <thead class="table-light">
-            <tr><th>Name</th><th>Folder</th><th></th></tr>
-          </thead>
-          <tbody id="manualSongsBody"></tbody>
-        </table>
-        <nav><ul class="pagination pagination-sm m-2" id="manualPagination"></ul></nav>
-      </div>
     </div>
-  </div>
-  <div class="col-lg-6 mb-4">
-    <div class="card h-100">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <div>
-          <h5 class="mb-0">Scan Directories</h5>
-          <small class="text-muted">Directories automatically scanned for music files</small>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-          <span class="badge bg-secondary" id="pathCount">0</span>
-          <a href="/library/directory/add" class="btn btn-sm btn-outline-secondary" title="Add Scan Directories"><i class="fas fa-folder-plus"></i></a>
-        </div>
-      </div>
-      <div class="card-body p-0">
-        <table class="table table-sm mb-0">
-          <thead class="table-light"><tr><th>Path</th><th>Songs</th><th></th></tr></thead>
-          <tbody id="pathsBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-</div>
-<div class="row">
-  <div class="col-12">
-    <div class="card">
-      <div class="card-header d-flex justify-content-between align-items-center">
-        <div>
-          <h5 class="mb-0">Directory Tree</h5>
-          <small class="text-muted">All song file paths (collapsible)</small>
-        </div>
-        <div class="input-group input-group-sm" style="width:250px;">
-          <span class="input-group-text"><i class="fas fa-search"></i></span>
-          <input class="form-control" id="treeFilter" placeholder="Filter..." oninput="filterTree()" />
-        </div>
-      </div>
-      <div class="card-body" style="max-height:400px; overflow:auto;">
-        <ul class="list-unstyled" id="directoryTree"></ul>
-      </div>
-    </div>
-  </div>
 </div>
 
+<!-- Songs Progress Modal -->
+<div class="modal fade" id="songsProgressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Adding Songs</h5>
+            </div>
+            <div class="modal-body">
+                <div class="progress mb-3">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                </div>
+                <div class="row text-center">
+                    <div class="col-6">
+                        <h6 class="text-primary">Added</h6>
+                        <span class="h4" id="songsAddedCount">0</span>
+                    </div>
+                    <div class="col-6">
+                        <h6 class="text-danger">Errors</h6>
+                        <span class="h4" id="songsErrorCount">0</span>
+                    </div>
+                </div>
+                <div id="currentSongFile" class="text-muted small mt-2 text-center"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="closeSongsBtn" style="display: none;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scan Progress Modal -->
+<div class="modal fade" id="scanProgressModal" tabindex="-1" data-bs-backdrop="static" data-bs-keyboard="false">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Scanning Directories</h5>
+            </div>
+            <div class="modal-body">
+                <div class="progress mb-3">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                </div>
+                <div class="row text-center">
+                    <div class="col-4">
+                        <h6 class="text-success">Found</h6>
+                        <span class="h4" id="foundCount">0</span>
+                    </div>
+                    <div class="col-4">
+                        <h6 class="text-primary">Added</h6>
+                        <span class="h4" id="scanAddedCount">0</span>
+                    </div>
+                    <div class="col-4">
+                        <h6 class="text-danger">Errors</h6>
+                        <span class="h4" id="scanErrorCount">0</span>
+                    </div>
+                </div>
+                <div id="currentScanFile" class="text-muted small mt-2 text-center"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="closeScanBtn" style="display: none;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 
 <script src="/static/js/file-browser.js"></script>
+
 <script>
-  
-const PAGE_SIZE = 25;
-let manualSongs = [];
-let paths = [];
-let directoryTree = {};
+// Initialize page-specific file browser
+let pageBrowser = null;
+let undoTimeout = null;
+let selectedSongs = [];
+let selectedDirectories = [];
 
-async function loadLibrary() {
-  try {
-    const resp = await fetch('/api/library/');
-    if(!resp.ok){ 
-      console.error('Failed to load library:', resp.status, resp.statusText); 
-      return; 
+document.addEventListener('DOMContentLoaded', function() {
+    // Initialize file browser with mixed selection configuration
+    pageBrowser = new FileBrowser({
+        disableDirectories: false, // Allow directory selection
+        disableFiles: false,       // Allow file selection
+        multiSelect: true
+    });
+    
+    // Start browsing immediately
+    pageBrowser.initializePage();
+    
+    // Bind page-specific events
+    bindPageEvents();
+});
+
+function bindPageEvents() {
+    // Refresh button
+    document.getElementById('refreshBtn').addEventListener('click', function() {
+        pageBrowser.loadDirectory();
+    });
+
+    // Scan library button
+    document.getElementById('scanLibraryBtn').addEventListener('click', function() {
+        scanLibrary();
+    });
+
+    // Add songs button
+    document.getElementById('addSongsBtn').addEventListener('click', function() {
+        if (selectedSongs.length > 0) {
+            addSelectedSongs();
+        }
+    });
+
+    // Add directories button
+    document.getElementById('addDirectoriesBtn').addEventListener('click', function() {
+        if (selectedDirectories.length > 0) {
+            addSelectedDirectories();
+        }
+    });
+
+    // Add all button
+    document.getElementById('addAllBtn').addEventListener('click', function() {
+        addAllSelected();
+    });
+
+    // Listen for selection changes from file browser
+    document.addEventListener('fileBrowserSelectionChanged', function(event) {
+        updateSelectionLists(event.detail.selectedItems);
+    });
+}
+
+function updateSelectionLists(selectedItems) {
+    // Separate songs and directories
+    selectedSongs = [];
+    selectedDirectories = [];
+    
+    selectedItems.forEach(item => {
+        if (item.isDirectory) {
+            selectedDirectories.push(item.path);
+        } else {
+            // Check if it's a music file
+            const musicExtensions = ['.mp3', '.wav', '.flac', '.m4a', '.aac', '.ogg', '.wma'];
+            const extension = item.path.toLowerCase().substring(item.path.lastIndexOf('.'));
+            if (musicExtensions.includes(extension)) {
+                selectedSongs.push(item.path);
+            }
+        }
+    });
+    
+    // Update counts and display
+    updateSelectionCounts();
+    updateSelectedListDisplay();
+}
+
+function updateSelectedListDisplay() {
+    const selectedList = document.getElementById('selectedList');
+    let html = '';
+    
+    if (selectedSongs.length === 0 && selectedDirectories.length === 0) {
+        html = '<div class="text-muted text-center">No items selected</div>';
+    } else {
+        // Show songs
+        if (selectedSongs.length > 0) {
+            html += '<div class="fw-bold text-primary mb-2"><i class="fas fa-music"></i> Songs:</div>';
+            selectedSongs.forEach(song => {
+                const filename = song.split('/').pop() || song.split('\\').pop();
+                html += `
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="text-truncate flex-grow-1" title="${song}">${filename}</small>
+                        <button class="btn btn-sm btn-outline-danger ms-2" onclick="removeSelectedItem('${song}')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+            });
+        }
+        
+        // Show directories
+        if (selectedDirectories.length > 0) {
+            if (selectedSongs.length > 0) html += '<hr class="my-2">';
+            html += '<div class="fw-bold text-success mb-2"><i class="fas fa-folder"></i> Directories:</div>';
+            selectedDirectories.forEach(dir => {
+                const dirname = dir.split('/').pop() || dir.split('\\').pop() || dir;
+                html += `
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <small class="text-truncate flex-grow-1" title="${dir}">${dirname}</small>
+                        <button class="btn btn-sm btn-outline-danger ms-2" onclick="removeSelectedItem('${dir}')">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+            });
+        }
     }
-    const data = await resp.json();
-    manualSongs = data.manual_songs || [];
-    paths = data.paths || [];
-    directoryTree = data.tree || {};
-    renderManualSongs(1);
-    renderPaths();
-    renderTree();
-  } catch (error) {
-    console.error('Error loading library:', error);
-  }
+    
+    selectedList.innerHTML = html;
 }
 
-function renderManualSongs(page){
-  const body = document.getElementById('manualSongsBody');
-  const start = (page-1)*PAGE_SIZE; 
-  const slice = manualSongs.slice(start,start+PAGE_SIZE);
-  
-  document.getElementById('manualCount').textContent = manualSongs.length;
-  
-  if (slice.length === 0) {
-    body.innerHTML = '<tr><td colspan="3" class="text-muted text-center">No manually added songs</td></tr>';
-    document.getElementById('manualPagination').innerHTML = '';
-    return;
-  }
-  
-  body.innerHTML = slice.map(s => `
-    <tr>
-      <td><strong>${s.display_name}</strong></td>
-      <td><small class="text-muted">${s.file_path}</small></td>
-      <td><button class="btn btn-sm btn-outline-danger" onclick="deleteManualSong(${s.id})"><i class="fas fa-trash"></i></button></td>
-    </tr>
-  `).join('');
-  
-  // Simple pagination
-  const totalPages = Math.ceil(manualSongs.length / PAGE_SIZE);
-  let paginationHTML = '';
-  for (let i = 1; i <= totalPages; i++) {
-    const active = i === page ? 'active' : '';
-    paginationHTML += `<li class="page-item ${active}"><a class="page-link" href="#" onclick="renderManualSongs(${i})">${i}</a></li>`;
-  }
-  document.getElementById('manualPagination').innerHTML = paginationHTML;
+function removeSelectedItem(itemPath) {
+    // Remove from pageBrowser's selectedItems
+    if (pageBrowser) {
+        pageBrowser.selectedItems.delete(itemPath);
+        pageBrowser.updateCheckboxes();
+    }
+    
+    // Remove from our local arrays
+    const songIndex = selectedSongs.indexOf(itemPath);
+    if (songIndex > -1) {
+        selectedSongs.splice(songIndex, 1);
+    }
+    
+    const dirIndex = selectedDirectories.indexOf(itemPath);
+    if (dirIndex > -1) {
+        selectedDirectories.splice(dirIndex, 1);
+    }
+    
+    // Update counts and display
+    updateSelectionCounts();
+    updateSelectedListDisplay();
 }
 
-function renderPaths(){
-  const body = document.getElementById('pathsBody');
-  document.getElementById('pathCount').textContent = paths.length;
-  
-  if (paths.length === 0) {
-    body.innerHTML = '<tr><td colspan="3" class="text-muted text-center">No scan directories configured</td></tr>';
-    return;
-  }
-  
-  body.innerHTML = paths.map(p => `
-    <tr>
-      <td><strong>${p.directory_path}</strong><br><small class="text-muted">Last scanned: ${p.last_scanned || 'Never'}</small></td>
-      <td>${p.song_count || 0}</td>
-      <td><button class="btn btn-sm btn-outline-danger" onclick="deletePath(${p.id})"><i class="fas fa-trash"></i></button></td>
-    </tr>
-  `).join('');
+function updateSelectionCounts() {
+    document.getElementById('selectedSongsCount').textContent = selectedSongs.length;
+    document.getElementById('selectedDirsCount').textContent = selectedDirectories.length;
+    document.getElementById('songsButtonCount').textContent = selectedSongs.length;
+    document.getElementById('dirsButtonCount').textContent = selectedDirectories.length;
+    
+    // Update button states
+    document.getElementById('addSongsBtn').disabled = selectedSongs.length === 0;
+    document.getElementById('addDirectoriesBtn').disabled = selectedDirectories.length === 0;
+    document.getElementById('addAllBtn').disabled = selectedSongs.length === 0 && selectedDirectories.length === 0;
 }
 
-function renderTree(){
-  const container = document.getElementById('directoryTree');
-  if (Object.keys(directoryTree).length === 0) {
-    container.innerHTML = '<li class="text-muted">No songs in library</li>';
-    return;
-  }
-  
-  const html = Object.entries(directoryTree).map(([folder, data]) => `
-    <li>
-      <div class="d-flex align-items-center">
-        <i class="fas fa-folder me-2"></i>
-        <strong>${folder}</strong>
-        <span class="badge bg-secondary ms-2">${data.songs ? data.songs.length : 0}</span>
-      </div>
-      ${data.songs && data.songs.length > 0 ? `
-        <ul class="list-unstyled ms-4 mt-1">
-          ${data.songs.map(song => `<li><i class="fas fa-file-audio me-2"></i>${song.display_name}</li>`).join('')}
-        </ul>
-      ` : ''}
-    </li>
-  `).join('');
-  
-  container.innerHTML = html;
+function clearAddedSongsFromSelection() {
+    // Clear all selected songs from the browser selection
+    selectedSongs.forEach(songPath => {
+        if (pageBrowser) {
+            pageBrowser.selectedItems.delete(songPath);
+        }
+    });
+    
+    // Clear our local arrays
+    selectedSongs = [];
+    
+    // Update the UI
+    updateSelectionCounts();
+    updateSelectedListDisplay();
+    
+    // Update checkboxes in the file browser
+    if (pageBrowser) {
+        pageBrowser.updateCheckboxes();
+    }
 }
 
-function filterTree() {
-  const filter = document.getElementById('treeFilter').value.toLowerCase();
-  const items = document.querySelectorAll('#directoryTree li');
-  
-  items.forEach(item => {
-    const text = item.textContent.toLowerCase();
-    item.style.display = text.includes(filter) ? '' : 'none';
-  });
+function clearAddedDirectoriesFromSelection() {
+    // Clear all selected directories from the browser selection
+    selectedDirectories.forEach(dirPath => {
+        if (pageBrowser) {
+            pageBrowser.selectedItems.delete(dirPath);
+        }
+    });
+    
+    // Clear our local arrays
+    selectedDirectories = [];
+    
+    // Update the UI
+    updateSelectionCounts();
+    updateSelectedListDisplay();
+    
+    // Update checkboxes in the file browser
+    if (pageBrowser) {
+        pageBrowser.updateCheckboxes();
+    }
 }
 
-async function deletePath(id) {
-  if (!confirm('Delete this scan directory? This will also remove all songs found in this directory.')) return;
+async function addSelectedSongs() {
+    if (selectedSongs.length === 0) return;
+    
+    // Show info notification about the process starting
+    const processingNotification = notificationSystem.info(
+        'Adding Songs', 
+        `Adding ${selectedSongs.length} song${selectedSongs.length === 1 ? '' : 's'} to your library...`,
+        { duration: 0 } // Don't auto-dismiss
+    );
+    
+    const songPaths = Array.from(selectedSongs);
+    let addedCount = 0;
+    let errorCount = 0;
+    
+    try {
+        const response = await fetch('/api/songs/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ songs: songPaths })
+        });
+
+        if (response.ok) {
+            const result = await response.json();
+            addedCount = result.added || 0;
+            errorCount = result.errors || 0;
+            const clonedPaths = structuredClone(songPaths);
+            // Dismiss the processing notification
+            notificationSystem.dismiss(processingNotification);
   
-  try {
-    await fetch(`/api/library/paths/${id}`, {method: 'DELETE'});
-    loadLibrary();
-  } catch (error) {
-    console.error('Error deleting path:', error);
-    notificationSystem.error('Error', 'Failed to delete path. Please try again.');
-  }
+            if (addedCount > 0) {
+                // Show success notification with undo option
+                notificationSystem.undo(
+                    'Songs Added',
+                    `Successfully added ${addedCount} song${addedCount === 1 ? '' : 's'} to your library.`,
+                    undoAddSongs,
+                    () => {
+                        // On undo timeout, clear the songs from selection and refresh
+                        clearAddedSongsFromSelection();
+                        pageBrowser.loadDirectory();
+                    },
+                    10,
+                    clonedPaths// Pass the song paths to the undo function
+                );
+                
+                // Clear added songs from selection immediately
+                clearAddedSongsFromSelection();
+                pageBrowser.loadDirectory();
+            }
+            
+            if (errorCount > 0) {
+                notificationSystem.warning(
+                    'Some Errors',
+                    `${errorCount} song${errorCount === 1 ? '' : 's'} could not be added. Please check the files.`
+                );
+            }
+            
+        } else {
+            // Dismiss the processing notification
+            notificationSystem.dismiss(processingNotification);
+            notificationSystem.error('Error', 'Failed to add songs to library. Please try again.');
+        }
+    
+    } catch (error) {
+        // Dismiss the processing notification
+        notificationSystem.dismiss(processingNotification);
+        notificationSystem.error('Error', 'Failed to add songs to library. Please check your connection.');
+        console.error('Error adding songs:', error);
+    }
+
 }
 
-async function deleteManualSong(id) {
-  if (!confirm('Delete this song?')) return;
-  
-  try {
-    await fetch(`/api/songs/${id}`, {method: 'DELETE'});
-    loadLibrary();
-  } catch (error) {
-    console.error('Error deleting song:', error);
-    notificationSystem.error('Error', 'Failed to delete song. Please try again.');
-  }
+async function addSelectedDirectories() {
+    if (selectedDirectories.length === 0) return;
+    
+    // Show info notification about the process starting
+    const processingNotification = notificationSystem.info(
+        'Adding Scan Directories', 
+        `Adding ${selectedDirectories.length} director${selectedDirectories.length === 1 ? 'y' : 'ies'} to scan list...`,
+        { duration: 0 } // Don't auto-dismiss
+    );
+    
+    const directoryPaths = Array.from(selectedDirectories);
+    
+    try {
+        const response = await fetch('/api/library/directory/add', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ paths: directoryPaths })
+        });
+        
+        if (response.ok) {
+            // Dismiss the processing notification
+            notificationSystem.dismiss(processingNotification);
+            const clonedPaths = structuredClone(directoryPaths);
+            
+            // Show success notification with undo option and scan trigger
+            notificationSystem.undo(
+                'Directories Added',
+                `Successfully added ${selectedDirectories.length} director${selectedDirectories.length === 1 ? 'y' : 'ies'} to scan list.`,
+                undoAddDirectories,
+                startDirectoryScan, // This will trigger the scan when undo expires
+                10,
+                clonedPaths // Pass the directory paths to the undo function
+            );
+            
+            // Clear selected directories from UI
+            clearAddedDirectoriesFromSelection();
+            
+        } else {
+            // Dismiss the processing notification
+            notificationSystem.dismiss(processingNotification);
+            
+            const errorText = await response.text();
+            notificationSystem.error(
+                'Error', 
+                `Failed to add directories to scan list. ${response.status}: ${errorText}`
+            );
+        }
+    } catch (error) {
+        // Dismiss the processing notification
+        notificationSystem.dismiss(processingNotification);
+        notificationSystem.error('Error', 'Failed to add directories to scan list. Please check your connection.');
+        console.error('Error adding directories:', error);
+    }
 }
 
-// Load library on page load
-document.addEventListener('DOMContentLoaded', loadLibrary);
+async function addAllSelected() {
+    // Add songs first, then directories
+    if (selectedSongs.length > 0) {
+        await addSelectedSongs();
+    }
+    
+    if (selectedDirectories.length > 0) {
+        setTimeout(() => {
+            addSelectedDirectories();
+        }, 1000); // Small delay to avoid modal conflicts
+    }
+}
+
+async function undoAddSongs(songPaths) {
+    // Show processing notification
+    const processingNotification = notificationSystem.info(
+        'Removing Songs', 
+        'Removing recently added songs from your library...',
+        { duration: 0 }
+    );
+    console.log('Undoing song addition:', songPaths);
+    try {
+        const response = await fetch('/api/songs/remove', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ paths: songPaths })
+        });
+        
+        // Dismiss processing notification
+        notificationSystem.dismiss(processingNotification);
+        
+        if (response.ok) {
+            const result = await response.json();
+            const removedCount = result.removed || selectedSongs.length;
+            
+            notificationSystem.success(
+                'Undo Successful', 
+                `Successfully removed ${removedCount} song${removedCount === 1 ? '' : 's'} from your library.`
+            );
+            
+            // Refresh the file browser to show updated state
+            if (pageBrowser) {
+                pageBrowser.loadDirectory();
+            }
+        } else {
+            const errorText = await response.text();
+            notificationSystem.error(
+                'Undo Failed', 
+                `Failed to remove songs from library. ${response.status}: ${errorText}`
+            );
+        }
+    } catch (error) {
+        // Dismiss processing notification
+        notificationSystem.dismiss(processingNotification);
+        notificationSystem.error('Undo Failed', 'Failed to remove songs from library. Please check your connection.');
+        console.error('Error removing songs:', error);
+    }
+}
+
+async function undoAddDirectories(directoryPaths) {
+    // Show processing notification
+    const processingNotification = notificationSystem.info(
+        'Removing Directories', 
+        'Removing directories from scan list...',
+        { duration: 0 }
+    );
+    
+    try {
+        const response = await fetch('/api/library/directory/remove', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ paths: directoryPaths })
+        });
+        
+        // Dismiss processing notification
+        notificationSystem.dismiss(processingNotification);
+        
+        if (response.ok) {
+            const result = await response.json();
+            const removedCount = result.removed || selectedDirectories.length;
+            
+            notificationSystem.success(
+                'Undo Successful', 
+                `Successfully removed ${removedCount} director${removedCount === 1 ? 'y' : 'ies'} from scan list.`
+            );
+        } else {
+            const errorText = await response.text();
+            notificationSystem.error(
+                'Undo Failed', 
+                `Failed to remove directories from scan list. ${response.status}: ${errorText}`
+            );
+        }
+    } catch (error) {
+        // Dismiss processing notification
+        notificationSystem.dismiss(processingNotification);
+        notificationSystem.error('Undo Failed', 'Failed to remove directories from scan list. Please check your connection.');
+        console.error('Error removing directories:', error);
+    }
+}
+
+async function startDirectoryScan() {
+    const scanModal = new bootstrap.Modal(document.getElementById('scanProgressModal'));
+    scanModal.show();
+    
+    const foundCount = document.getElementById('foundCount');
+    const scanAddedCount = document.getElementById('scanAddedCount');
+    const scanErrorCount = document.getElementById('scanErrorCount');
+    const currentScanFile = document.getElementById('currentScanFile');
+    const closeScanBtn = document.getElementById('closeScanBtn');
+    
+    // Add event listener for close button
+    closeScanBtn.onclick = function() {
+        scanModal.hide();
+    };
+    
+    try {
+        const response = await fetch('/api/library/scan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ paths: selectedDirectories })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            foundCount.textContent = result.found || 0;
+            scanAddedCount.textContent = result.added || 0;
+            scanErrorCount.textContent = result.errors || 0;
+            currentScanFile.textContent = 'Scan complete!';
+        } else {
+            scanErrorCount.textContent = '1';
+            currentScanFile.textContent = 'Scan failed!';
+        }
+    } catch (error) {
+        scanErrorCount.textContent = '1';
+        currentScanFile.textContent = 'Scan failed!';
+    }
+    
+    closeScanBtn.style.display = 'block';
+}
+
+async function scanLibrary() {
+    // Show processing notification
+    const processingNotification = notificationSystem.info(
+        'Scanning Library', 
+        'Scanning all configured directories for new songs...',
+        { duration: 0 }
+    );
+    
+    try {
+        const response = await fetch('/api/library/scan/all', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
+        
+        // Dismiss processing notification
+        notificationSystem.dismiss(processingNotification);
+        
+        if (response.ok) {
+            const result = await response.json();
+            const found = result.found || 0;
+            const added = result.added || 0;
+            const errors = result.errors || 0;
+            
+            let message = `Scan complete! Found ${found} audio files.`;
+            if (added > 0) {
+                message += ` Added ${added} new songs to your library.`;
+            }
+            if (errors > 0) {
+                message += ` ${errors} errors occurred.`;
+            }
+            
+            if (added > 0) {
+                notificationSystem.success('Library Scan Complete', message);
+                // Refresh the file browser to show new items
+                if (pageBrowser) {
+                    pageBrowser.loadDirectory();
+                }
+            } else {
+                notificationSystem.info('Library Scan Complete', message);
+            }
+        } else {
+            const errorText = await response.text();
+            notificationSystem.error(
+                'Scan Failed', 
+                `Failed to scan library. ${response.status}: ${errorText}`
+            );
+        }
+    } catch (error) {
+        // Dismiss processing notification
+        notificationSystem.dismiss(processingNotification);
+        notificationSystem.error('Scan Failed', 'Failed to scan library. Please check your connection.');
+        console.error('Error scanning library:', error);
+    }
+}
 </script>
 {% endblock %}

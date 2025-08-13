@@ -22,6 +22,9 @@ class AddSongsRequest(BaseModel):
 class RemoveSongsRequest(BaseModel):
     paths: List[str]
 
+class RemoveSongsByIdRequest(BaseModel):
+    ids: List[int]
+
 class BatchTagRequest(BaseModel):
     song_ids: List[int]
     tag_ids: List[int]
@@ -209,7 +212,9 @@ async def remove_songs(
     """
     removed = 0
     errors = []
-
+    if len(songs.paths) == 0:
+        raise HTTPException(status_code=400, detail="No song paths provided")
+    print(f"Removing songs: {songs.paths}")
     for file_path in songs.paths:
         # Find song by file path
         existing_song = db.query(Song).filter(Song.file_path == file_path).first()
@@ -220,7 +225,43 @@ async def remove_songs(
             errors.append(f"Song not found in database: {file_path}")
 
     db.commit()
+    print(f"Removed songs: {removed}")
+    print(f"Errors: {errors}")
     return {"removed": removed, "errors": errors}
+
+@router.post("/remove-by-id")
+async def remove_songs_by_id(
+    songs: RemoveSongsByIdRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Remove songs by IDs (more reliable than file paths).
+    """
+    removed = 0
+    errors = []
+    removed_paths = []
+    
+    if len(songs.ids) == 0:
+        raise HTTPException(status_code=400, detail="No song IDs provided")
+    
+    print(f"Removing songs by ID: {songs.ids}")
+    
+    for song_id in songs.ids:
+        # Find song by ID
+        existing_song = db.query(Song).filter(Song.id == song_id).first()
+        if existing_song:
+            removed_paths.append(existing_song.file_path)  # Store path for undo
+            db.delete(existing_song)
+            removed += 1
+            print(f"Removed song ID {song_id}: {existing_song.file_path}")
+        else:
+            errors.append(f"Song not found with ID: {song_id}")
+            print(f"Song not found with ID: {song_id}")
+
+    db.commit()
+    print(f"Removed songs: {removed}")
+    print(f"Errors: {errors}")
+    return {"removed": removed, "errors": errors, "removed_paths": removed_paths}
 
 @router.post("/upload-file", deprecated=True)
 async def upload_song_file(
