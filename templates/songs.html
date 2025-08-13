@@ -181,6 +181,9 @@
                             <th width="100" style="cursor: pointer;" onclick="sortTable('tempo')">
                                 Tempo <i class="fas fa-sort" id="sort-tempo"></i>
                             </th>
+                            <th width="140" style="cursor: pointer;" onclick="sortTable('created_at')">
+                                Created At <i class="fas fa-sort" id="sort-created_at"></i>
+                            </th>
                             <th width="180">Mood</th>
                         </tr>
                     </thead>
@@ -681,10 +684,14 @@ function sortTable(column) {
         if (aVal == null) return 1;
         if (bVal == null) return -1;
         
-        // Convert to string for comparison, except for numbers
+        // Convert to string for comparison, except for numbers and dates
         if (column === 'tempo' || column === 'duration' || column === 'track_number' || column === 'year') {
             aVal = parseFloat(aVal) || 0;
             bVal = parseFloat(bVal) || 0;
+        } else if (column === 'created_at' || column === 'last_played' || column === 'updated_at') {
+            // Handle date fields
+            aVal = new Date(aVal).getTime() || 0;
+            bVal = new Date(bVal).getTime() || 0;
         } else {
             aVal = String(aVal).toLowerCase();
             bVal = String(bVal).toLowerCase();
@@ -727,6 +734,14 @@ function renderSongsTable() {
             return `${mins}:${secs.toString().padStart(2, '0')}`;
         };
         
+        // Format date/time
+        const formatDateTime = (dateString) => {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return '';
+            return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        };
+        
         // COMMENTED OUT: Complex mood calculations for debugging
         const energy = song.energy !== null && song.energy !== undefined ? Math.max((song.energy * 100).toFixed(0), 2) : '0';
         const valence = song.valence !== null && song.valence !== undefined ? Math.max((song.valence * 100).toFixed(0), 2) : '0';
@@ -760,6 +775,7 @@ function renderSongsTable() {
             <td class="song-album-cell" title="${song.album || ''}" style="max-width: 160px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${song.album || ''}</td>
             <td><small>${formatDuration(song.duration)}</small></td>
             <td><small>${song.tempo ? Math.round(song.tempo) + ' BPM' : ''}</small></td>
+            <td><small>${formatDateTime(song.created_at)}</small></td>
             <td style="padding: 4px; height: 40px; vertical-align: middle;">
                 <div class="mood-bars" title="Test: Energy: ${energy}% | Valence: ${valence}% | Danceability: ${danceability}%" style="height: 32px !important; min-height: 32px !important; display: flex !important; flex-direction: column !important;">
                     <div class="mood-bar-container" style="height: 8px !important; min-height: 8px !important; background-color: #e9ecef ; margin-bottom: 2px ;">
@@ -1126,165 +1142,6 @@ async function applyBatchTags() {
     }
 }
 
-async function addSingleSong() {
-    const fileInput = document.getElementById('filePathInput');
-    const displayName = document.getElementById('displayName').value.trim();
-    
-    // Check if a file was selected using file picker
-    if (fileInput.selectedFile) {
-        const formData = new FormData();
-        formData.append('file', fileInput.selectedFile);
-        if (displayName) {
-            formData.append('display_name', displayName);
-        }
-        
-        try {
-            const response = await fetch('/api/songs/upload-file', {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (response.ok) {
-                const modal = bootstrap.Modal.getInstance(document.getElementById('addFileModal'));
-                modal.hide();
-                document.getElementById('addFileForm').reset();
-                fileInput.selectedFile = null;
-                loadSongs();
-                alert('Song uploaded successfully!');
-            } else {
-                const error = await response.json();
-                alert(`Error uploading song: ${error.detail}`);
-            }
-        } catch (error) {
-            console.error('Error uploading song:', error);
-            alert('Error uploading song');
-        }
-    } else {
-        // Fallback to file path method
-        const filePath = document.getElementById('filePath').value.trim();
-        
-        if (!filePath) {
-            alert('Please select a file or enter a file path');
-            return;
-        }
-        
-        try {
-            const response = await fetch('/api/songs/add', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    file_path: filePath,
-                    display_name: displayName || null
-                })
-            });
-            
-            if (response.ok) {
-                const modal = bootstrap.Modal.getInstance(document.getElementById('addFileModal'));
-                modal.hide();
-                document.getElementById('addFileForm').reset();
-                loadSongs();
-                alert('Song added successfully!');
-            } else {
-                const error = await response.json();
-                alert(`Error adding song: ${error.detail}`);
-            }
-        } catch (error) {
-            console.error('Error adding song:', error);
-            alert('Error adding song');
-        }
-    }
-}
-
-async function addMultipleSongs() {
-    const fileInput = document.getElementById('multipleFilesInput');
-    
-    // Check if files were selected using file picker
-    if (fileInput.selectedFiles && fileInput.selectedFiles.length > 0) {
-        const formData = new FormData();
-        for (const file of fileInput.selectedFiles) {
-            formData.append('files', file);
-        }
-        
-        try {
-            const response = await fetch('/api/songs/upload-multiple', {
-                method: 'POST',
-                body: formData
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                const modal = bootstrap.Modal.getInstance(document.getElementById('addMultipleModal'));
-                modal.hide();
-                document.getElementById('filePathsList').value = '';
-                fileInput.selectedFiles = null;
-                loadSongs();
-                
-                // Show detailed results
-                let message = result.summary;
-                if (result.errors.length > 0) {
-                    message += '\n\nErrors:\n' + result.errors.join('\n');
-                }
-                alert(message);
-            } else {
-                const error = await response.json();
-                alert(`Error uploading songs: ${error.detail}`);
-            }
-        } catch (error) {
-            console.error('Error uploading songs:', error);
-            alert('Error uploading songs');
-        }
-    } else {
-        // Fallback to file paths method
-        const filePathsText = document.getElementById('filePathsList').value.trim();
-        
-        if (!filePathsText) {
-            alert('Please select files or enter at least one file path');
-            return;
-        }
-        
-        const filePaths = filePathsText.split('\n')
-            .map(path => path.trim())
-            .filter(path => path.length > 0);
-        
-        if (filePaths.length === 0) {
-            alert('Please enter valid file paths');
-            return;
-        }
-        
-        try {
-            const response = await fetch('/api/songs/add-multiple', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(filePaths)
-            });
-            
-            if (response.ok) {
-                const result = await response.json();
-                const modal = bootstrap.Modal.getInstance(document.getElementById('addMultipleModal'));
-                modal.hide();
-                document.getElementById('filePathsList').value = '';
-                loadSongs();
-                
-                // Show detailed results
-                let message = result.summary;
-                if (result.errors.length > 0) {
-                    message += '\n\nErrors:\n' + result.errors.join('\n');
-                }
-                alert(message);
-            } else {
-                const error = await response.json();
-                alert(`Error adding songs: ${error.detail}`);
-            }
-        } catch (error) {
-            console.error('Error adding songs:', error);
-            alert('Error adding songs');
-        }
-    }
-}
 
 async function scanDirectory() {
     const directoryInput = document.getElementById('directoryInput');

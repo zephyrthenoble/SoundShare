@@ -41,27 +41,57 @@ class ScanDirectoryRequest(BaseModel):
 router = APIRouter()
 audio_analyzer = AudioAnalyzer()
 
+def _validate_audio_file(file_path: str):
+    """
+    Validate if a file is a valid audio file.
+    Returns (is_valid, error_message) tuple.
+    """
+    # Check if file exists
+    if not os.path.exists(file_path):
+        return False, "File not found"
+    
+    # Check if it's an audio file
+    file_ext = Path(file_path).suffix.lower()
+    if file_ext not in AUDIO_EXTENSIONS:
+        return False, "Invalid audio file format"
+    
+    # Check file size - reject zero-length files
+    try:
+        file_size = os.path.getsize(file_path)
+        if file_size == 0:
+            return False, "File is empty (0 bytes)"
+    except OSError:
+        return False, "Cannot access file"
+    
+    return True, None
+
+def _process_year_value(year_value):
+    """
+    Process year value from metadata, handling both string dates and integers.
+    Returns integer year or None.
+    """
+    if year_value and isinstance(year_value, str):
+        try:
+            return int(year_value.split('-')[0])
+        except (ValueError, IndexError):
+            return None
+    elif year_value:
+        try:
+            return int(year_value)
+        except (ValueError, TypeError):
+            return None
+    return None
+
 async def _analyze_and_create_song(file_path: str, manually_added: bool = True):
     """
     Analyze a single audio file and create a Song object with full metadata.
     Returns (song, error) tuple where one will be None.
     """
     try:
-        # Check if file exists
-        if not os.path.exists(file_path):
-            return None, f"File not found: {file_path}"
-
-        # Check if it's an audio file
-        valid_extensions = AUDIO_EXTENSIONS
-        file_ext = Path(file_path).suffix.lower()
-        if file_ext not in valid_extensions:
-            return None, f"Invalid audio file format: {file_path}"
-
-        # Check file size - reject zero-length files
-        file_info = Path(file_path)
-        file_size = file_info.stat().st_size
-        if file_size == 0:
-            return None, f"File '{file_path}' is empty (0 bytes) and cannot be added"
+        # Validate audio file
+        is_valid, error_msg = _validate_audio_file(file_path)
+        if not is_valid:
+            return None, f"File '{file_path}': {error_msg}"
 
         # Analyze audio and extract metadata
         try:
@@ -69,8 +99,10 @@ async def _analyze_and_create_song(file_path: str, manually_added: bool = True):
         except Exception as e:
             return None, f"Failed to analyze audio for {file_path}: {str(e)}"
         
-        # Get filename
+        # Get filename and file info
+        file_info = Path(file_path)
         filename = file_info.name
+        file_size = file_info.stat().st_size
         
         # Use metadata title if available, otherwise use parsed title or filename
         final_display_name = (
@@ -79,18 +111,8 @@ async def _analyze_and_create_song(file_path: str, manually_added: bool = True):
             filename
         )
         
-        # Extract year from date if it's a full date
-        year_value = analysis.get('year')
-        if year_value and isinstance(year_value, str):
-            try:
-                year_value = int(year_value.split('-')[0])
-            except (ValueError, IndexError):
-                year_value = None
-        elif year_value:
-            try:
-                year_value = int(year_value)
-            except (ValueError, TypeError):
-                year_value = None
+        # Process year value
+        year_value = _process_year_value(analysis.get('year'))
         
         # Get track number from metadata or filename parsing
         track_number = (
@@ -149,6 +171,75 @@ async def _create_songs_from_paths(file_paths: List[str], db: Session, manually_
             added_songs.append(song)
 
     return added_songs, errors
+
+async def _create_song_from_file_path(file_path: str, db: Session, manually_added: bool = True, skip_existing: bool = True):
+    """
+    Create a song record from a file path with full validation and metadata analysis.
+    Returns (song, error) tuple where one will be None.
+    """
+    try:
+        # Validate audio file
+        is_valid, error_msg = _validate_audio_file(file_path)
+        if not is_valid:
+            return None, f"{file_path}: {error_msg}"
+        
+        # Check if song already exists
+        if skip_existing:
+            existing_song = db.query(Song).filter(Song.file_path == file_path).first()
+            if existing_song:
+                return None, f"{file_path}: Song already exists in database"
+        
+        # Analyze audio and extract metadata
+        try:
+            analysis = audio_analyzer.analyze_song(file_path)
+        except Exception as e:
+            return None, f"{file_path}: Failed to analyze audio - {str(e)}"
+        
+        # Get file info
+        file_info = Path(file_path)
+        filename = file_info.name
+        file_size = file_info.stat().st_size
+        
+        # Use metadata title if available, otherwise use parsed title or filename
+        final_display_name = (
+            analysis.get('title') or 
+            analysis.get('parsed_title') or 
+            filename
+        )
+        
+        # Process year value
+        year_value = _process_year_value(analysis.get('year'))
+        
+        # Get track number from metadata or filename parsing
+        track_number = (
+            analysis.get('track') or 
+            analysis.get('parsed_track')
+        )
+        
+        # Create song record
+        song = Song(
+            filename=filename,
+            display_name=final_display_name,
+            file_path=file_path,
+            file_size=file_size,
+            duration=analysis.get('duration'),
+            tempo=analysis.get('tempo'),
+            key=analysis.get('key'),
+            energy=analysis.get('energy', 0.5),
+            valence=analysis.get('valence', 0.5),
+            danceability=analysis.get('danceability', 0.5),
+            artist=analysis.get('artist'),
+            album=analysis.get('album'),
+            year=year_value,
+            genre=analysis.get('genre'),
+            track_number=track_number,
+            manually_added=manually_added
+        )
+        
+        return song, None
+        
+    except Exception as e:
+        return None, f"{file_path}: Unexpected error - {str(e)}"
 
 def _validate_and_clean_songs(db: Session):
     """
@@ -259,38 +350,6 @@ async def get_song(song_id: int, db: Session = Depends(get_db)):
     if not song:
         raise HTTPException(status_code=404, detail="Song not found")
     return song
-
-@router.post("/add")
-async def add_song_file(
-    songs: AddSongsRequest,
-    db: Session = Depends(get_db)
-):
-    """
-    Add songs by referencing existing file paths.
-    """
-    print("Starting song addition process")
-    
-    # Use shared function to create songs with full metadata
-    added_songs, errors = await _create_songs_from_paths(songs.songs, db, manually_added=True)
-    
-    # Add all songs to database
-    for song in added_songs:
-        db.add(song)
-    
-    db.commit()
-    
-    # Refresh all songs to get their IDs
-    for song in added_songs:
-        db.refresh(song)
-    
-    print("Added:", len(added_songs))
-    print("Errors:", len(errors))
-    if errors:
-        print("Error details:")
-        for error in errors:
-            print(f" - {error}")
-    
-    return {"found": 0, "added": len(added_songs), "errors": len(errors)}
 
 @router.post("/remove")
 async def remove_songs(
@@ -452,250 +511,10 @@ async def rescan_songs(
     
     return {"updated": updated, "errors": errors}
 
-@router.post("/upload-file", deprecated=True)
-async def upload_song_file(
-    file: UploadFile,
-    display_name: Optional[str] = Form(None),
-    db: Session = Depends(get_db)
-):
-    """Upload a song file and add it to the database."""
-    
-    # Check if it's an audio file
-    valid_extensions = {'.mp3', '.wav', '.flac', '.m4a', '.ogg', '.wma'}
-    file_ext = Path(file.filename or '').suffix.lower()
-    if file_ext not in valid_extensions:
-        raise HTTPException(status_code=400, detail="Invalid audio file format")
-    
-    # Create uploads directory if it doesn't exist
-    uploads_dir = Path("uploads")
-    uploads_dir.mkdir(exist_ok=True)
-    
-    # Save the uploaded file
-    filename = file.filename or 'unknown'
-    file_path = uploads_dir / filename
-    
-    # Check if file already exists
-    if file_path.exists():
-        # Generate a unique filename
-        stem = file_path.stem
-        suffix = file_path.suffix
-        counter = 1
-        while file_path.exists():
-            file_path = uploads_dir / f"{stem}_{counter}{suffix}"
-            counter += 1
-    
-    # Save the file
-    try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save file: {str(e)}")
-    
-    # Check if song already exists in database
-    existing_song = db.query(Song).filter(Song.file_path == str(file_path)).first()
-    if existing_song:
-        # Remove the uploaded file since it already exists
-        file_path.unlink()
-        raise HTTPException(status_code=409, detail="Song already exists in database")
-    
-    # Check file size
-    file_size = file_path.stat().st_size
-    if file_size == 0:
-        file_path.unlink()
-        raise HTTPException(status_code=400, detail="Uploaded file is empty")
-    
-    # Analyze audio and extract metadata
-    try:
-        analysis = audio_analyzer.analyze_song(str(file_path))
-    except Exception as e:
-        file_path.unlink()  # Clean up on error
-        raise HTTPException(status_code=500, detail=f"Failed to analyze audio: {str(e)}")
-    
-    # Use metadata title if available, otherwise use parsed title or filename
-    final_display_name = display_name
-    if not final_display_name:
-        final_display_name = (
-            analysis.get('title') or 
-            analysis.get('parsed_title') or 
-            file.filename
-        )
-    
-    # Extract year from date if it's a full date
-    year_value = analysis.get('year')
-    if year_value and isinstance(year_value, str):
-        try:
-            year_value = int(year_value.split('-')[0])
-        except (ValueError, IndexError):
-            year_value = None
-    elif year_value:
-        try:
-            year_value = int(year_value)
-        except (ValueError, TypeError):
-            year_value = None
-    
-    # Get track number from metadata or filename parsing
-    track_number = (
-        analysis.get('track') or 
-        analysis.get('parsed_track')
-    )
-    
-    # Create song record
-    song = Song(
-        filename=file.filename,
-        display_name=final_display_name,
-        file_path=str(file_path),
-        file_size=file_size,
-        duration=analysis.get('duration'),
-        tempo=analysis.get('tempo'),
-        key=analysis.get('key'),
-        energy=analysis.get('energy', 0.5),
-        valence=analysis.get('valence', 0.5),
-        danceability=analysis.get('danceability', 0.5),
-        artist=analysis.get('artist'),
-        album=analysis.get('album'),
-        year=year_value,
-        genre=analysis.get('genre'),
-        track_number=track_number
-    )
-    
-    db.add(song)
-    db.commit()
-    db.refresh(song)
-    
-    return song
 
-@router.post("/upload-multiple")
-async def upload_multiple_songs(
-    files: List[UploadFile],
-    db: Session = Depends(get_db)
-):
-    """Upload multiple song files and add them to the database."""
-    
-    added_songs = []
-    errors = []
-    
-    # Create uploads directory if it doesn't exist
-    uploads_dir = Path("uploads")
-    uploads_dir.mkdir(exist_ok=True)
-    
-    for file in files:
-        try:
-            # Check if it's an audio file
-            valid_extensions = {'.mp3', '.wav', '.flac', '.m4a', '.ogg', '.wma'}
-            file_ext = Path(file.filename or '').suffix.lower()
-            if file_ext not in valid_extensions:
-                errors.append(f"{file.filename}: Invalid audio file format")
-                continue
-            
-            # Save the uploaded file
-            filename = file.filename or 'unknown'
-            file_path = uploads_dir / filename
-            
-            # Generate unique filename if needed
-            if file_path.exists():
-                stem = file_path.stem
-                suffix = file_path.suffix
-                counter = 1
-                while file_path.exists():
-                    file_path = uploads_dir / f"{stem}_{counter}{suffix}"
-                    counter += 1
-            
-            # Save the file
-            try:
-                with open(file_path, "wb") as buffer:
-                    shutil.copyfileobj(file.file, buffer)
-            except Exception as e:
-                errors.append(f"{file.filename}: Failed to save file - {str(e)}")
-                continue
-            
-            # Check file size
-            file_size = file_path.stat().st_size
-            if file_size == 0:
-                file_path.unlink()
-                errors.append(f"{file.filename}: File is empty")
-                continue
-            
-            # Check if song already exists in database
-            existing_song = db.query(Song).filter(Song.file_path == str(file_path)).first()
-            if existing_song:
-                file_path.unlink()
-                errors.append(f"{file.filename}: Song already exists in database")
-                continue
-            
-            # Analyze audio and extract metadata
-            try:
-                analysis = audio_analyzer.analyze_song(str(file_path))
-            except Exception as e:
-                file_path.unlink()
-                errors.append(f"{file.filename}: Failed to analyze audio - {str(e)}")
-                continue
-            
-            # Use metadata title if available, otherwise use parsed title or filename
-            final_display_name = (
-                analysis.get('title') or 
-                analysis.get('parsed_title') or 
-                file.filename
-            )
-            
-            # Extract year from date if it's a full date
-            year_value = analysis.get('year')
-            if year_value and isinstance(year_value, str):
-                try:
-                    year_value = int(year_value.split('-')[0])
-                except (ValueError, IndexError):
-                    year_value = None
-            elif year_value:
-                try:
-                    year_value = int(year_value)
-                except (ValueError, TypeError):
-                    year_value = None
-            
-            # Get track number from metadata or filename parsing
-            track_number = (
-                analysis.get('track') or 
-                analysis.get('parsed_track')
-            )
-            
-            # Create song record
-            song = Song(
-                filename=file.filename,
-                display_name=final_display_name,
-                file_path=str(file_path),
-                file_size=file_size,
-                duration=analysis.get('duration'),
-                tempo=analysis.get('tempo'),
-                key=analysis.get('key'),
-                energy=analysis.get('energy', 0.5),
-                valence=analysis.get('valence', 0.5),
-                danceability=analysis.get('danceability', 0.5),
-                artist=analysis.get('artist'),
-                album=analysis.get('album'),
-                year=year_value,
-                genre=analysis.get('genre'),
-                track_number=track_number
-            )
-            
-            db.add(song)
-            added_songs.append(song)
-            
-        except Exception as e:
-            errors.append(f"{file.filename}: Unexpected error - {str(e)}")
-    
-    # Commit all successful additions
-    if added_songs:
-        db.commit()
-        for song in added_songs:
-            db.refresh(song)
-    
-    return {
-        "added_songs": added_songs,
-        "errors": errors,
-        "summary": f"Uploaded {len(added_songs)} songs, {len(errors)} errors"
-    }
-
-@router.post("/add-multiple")
-async def add_multiple_songs(
-    file_paths: List[str],
+@router.post("/add")
+async def add_songs(
+    songs: AddSongsRequest,
     db: Session = Depends(get_db)
 ):
     """Add multiple songs by referencing existing file paths."""
@@ -703,93 +522,13 @@ async def add_multiple_songs(
     added_songs = []
     errors = []
     
-    for file_path in file_paths:
-        try:
-            # Check if file exists
-            if not os.path.exists(file_path):
-                errors.append(f"{file_path}: File not found")
-                continue
-            
-            # Check if it's an audio file
-            valid_extensions = {'.mp3', '.wav', '.flac', '.m4a', '.ogg', '.wma'}
-            file_ext = Path(file_path).suffix.lower()
-            if file_ext not in valid_extensions:
-                errors.append(f"{file_path}: Invalid audio file format")
-                continue
-            
-            # Check if song already exists
-            existing_song = db.query(Song).filter(Song.file_path == file_path).first()
-            if existing_song:
-                errors.append(f"{file_path}: Song already exists in database")
-                continue
-            
-            # Get file info and check size
-            file_info = Path(file_path)
-            file_size = file_info.stat().st_size
-            if file_size == 0:
-                errors.append(f"{file_path}: File is empty (0 bytes)")
-                continue
-            
-            # Analyze audio and extract metadata
-            try:
-                analysis = audio_analyzer.analyze_song(file_path)
-            except Exception as e:
-                errors.append(f"{file_path}: Failed to analyze audio - {str(e)}")
-                continue
-            
-            # Get filename (file_info already retrieved above for size check)
-            filename = file_info.name
-            
-            # Use metadata title if available, otherwise use parsed title or filename
-            final_display_name = (
-                analysis.get('title') or 
-                analysis.get('parsed_title') or 
-                filename
-            )
-            
-            # Extract year from date if it's a full date
-            year_value = analysis.get('year')
-            if year_value and isinstance(year_value, str):
-                try:
-                    year_value = int(year_value.split('-')[0])
-                except (ValueError, IndexError):
-                    year_value = None
-            elif year_value:
-                try:
-                    year_value = int(year_value)
-                except (ValueError, TypeError):
-                    year_value = None
-            
-            # Get track number from metadata or filename parsing
-            track_number = (
-                analysis.get('track') or 
-                analysis.get('parsed_track')
-            )
-            
-            # Create song record
-            song = Song(
-                filename=filename,
-                display_name=final_display_name,
-                file_path=file_path,
-                file_size=file_size,
-                duration=analysis.get('duration'),
-                tempo=analysis.get('tempo'),
-                key=analysis.get('key'),
-                energy=analysis.get('energy', 0.5),
-                valence=analysis.get('valence', 0.5),
-                danceability=analysis.get('danceability', 0.5),
-                artist=analysis.get('artist'),
-                album=analysis.get('album'),
-                year=year_value,
-                genre=analysis.get('genre'),
-                track_number=track_number
-            )
-            
+    for file_path in songs.songs:
+        song, error = await _create_song_from_file_path(file_path, db, manually_added=True, skip_existing=True)
+        if error:
+            errors.append(error)
+        else:
             db.add(song)
             added_songs.append(song)
-            
-        except Exception as e:
-            errors.append(f"{file_path}: Unexpected error - {str(e)}")
     
     # Commit all successful additions
     if added_songs:
@@ -798,8 +537,10 @@ async def add_multiple_songs(
             db.refresh(song)
     
     return {
+        "found": 0,  # Keep for backward compatibility
+        "added": len(added_songs),
+        "errors": len(errors),
         "added_songs": added_songs,
-        "errors": errors,
         "summary": f"Added {len(added_songs)} songs, {len(errors)} errors"
     }
 
@@ -871,85 +612,19 @@ async def scan_directory(
             "summary": "No valid audio files found in directory"
         }
     
-    # Add the found files using the multiple songs endpoint logic
+    # Add the found files using the shared song creation logic
     added_songs = []
     errors = []
     
     for file_path in audio_files:
-        try:
-            # Check if song already exists
-            existing_song = db.query(Song).filter(Song.file_path == file_path).first()
-            if existing_song:
-                continue  # Skip existing songs
-            
-            # Get file info
-            file_info = Path(file_path)
-            file_size = file_info.stat().st_size
-            
-            # Skip zero-length files
-            if file_size == 0:
-                errors.append(f"{file_path}: File is empty (0 bytes)")
-                continue
-            
-            # Analyze audio and extract metadata
-            try:
-                analysis = audio_analyzer.analyze_song(file_path)
-            except Exception as e:
-                errors.append(f"{file_path}: Failed to analyze audio - {str(e)}")
-                continue
-            
-            filename = file_info.name
-            
-            # Use metadata title if available, otherwise use parsed title or filename
-            final_display_name = (
-                analysis.get('title') or 
-                analysis.get('parsed_title') or 
-                filename
-            )
-            
-            # Extract year from date if it's a full date
-            year_value = analysis.get('year')
-            if year_value and isinstance(year_value, str):
-                try:
-                    year_value = int(year_value.split('-')[0])
-                except (ValueError, IndexError):
-                    year_value = None
-            elif year_value:
-                try:
-                    year_value = int(year_value)
-                except (ValueError, TypeError):
-                    year_value = None
-            
-            # Get track number from metadata or filename parsing
-            track_number = (
-                analysis.get('track') or 
-                analysis.get('parsed_track')
-            )
-            
-            # Create song record
-            song = Song(
-                filename=filename,
-                display_name=final_display_name,
-                file_path=file_path,
-                file_size=file_size,
-                duration=analysis.get('duration'),
-                tempo=analysis.get('tempo'),
-                key=analysis.get('key'),
-                energy=analysis.get('energy', 0.5),
-                valence=analysis.get('valence', 0.5),
-                danceability=analysis.get('danceability', 0.5),
-                artist=analysis.get('artist'),
-                album=analysis.get('album'),
-                year=year_value,
-                genre=analysis.get('genre'),
-                track_number=track_number
-            )
-            
+        song, error = await _create_song_from_file_path(file_path, db, manually_added=False, skip_existing=True)
+        if error:
+            # Only append error if it's not about existing songs (we skip those silently)
+            if "already exists" not in error:
+                errors.append(error)
+        else:
             db.add(song)
             added_songs.append(song)
-            
-        except Exception as e:
-            errors.append(f"{file_path}: Unexpected error - {str(e)}")
     
     # Commit all successful additions
     if added_songs:
