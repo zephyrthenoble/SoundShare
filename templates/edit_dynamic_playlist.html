@@ -252,6 +252,7 @@
 
 <script src="/static/js/playlist-player.js"></script>
 <script src="/static/js/playlist-common.js"></script>
+    <script src="/static/js/media-player.js"></script>
 <!-- Add SortableJS for potential drag and drop functionality -->
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
 
@@ -294,7 +295,10 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // Setup collapse toggle icons
-    setupCollapseToggles();
+    setupCollapseToggles([
+        { sectionId: 'currentSongsSection', toggleId: 'currentSongsToggle' },
+        { sectionId: 'songPreviewSection', toggleId: 'songPreviewToggle' }
+    ]);
     
     loadAllData();
 });
@@ -1081,15 +1085,6 @@ async function rescanPlaylist() {
         button.disabled = false;
     }
 }
-
-// Setup collapse toggle icons using common function
-function setupCollapseToggles() {
-    window.setupCollapseToggles([
-        { sectionId: 'currentSongsSection', toggleId: 'currentSongsToggle' },
-        { sectionId: 'songPreviewSection', toggleId: 'songPreviewToggle' }
-    ]);
-}
-
 
 
 // Current Songs functionality

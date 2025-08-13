@@ -324,6 +324,9 @@ class SoundShareMediaPlayer {
 // Create global media player instance
 const mediaPlayer = new SoundShareMediaPlayer();
 
+// Make it globally available
+window.mediaPlayer = mediaPlayer;
+
 // Legacy function support for backward compatibility
 function playPreview(songId) {
     mediaPlayer.toggle(songId);
