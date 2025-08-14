@@ -23,25 +23,18 @@
 </div>
 
 <!-- Playlist Details -->
-<div class="row mb-4">
+<div class="row mb-3">
     <div class="col-12">
         <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Playlist Details</h5>
-            </div>
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="playlistName" class="form-label">Playlist Name *</label>
-                            <input type="text" class="form-control" id="playlistName" required>
-                        </div>
+            <div class="card-body py-3">
+                <div class="row align-items-center">
+                    <div class="col-md-4">
+                        <label for="playlistName" class="form-label mb-1">Playlist Name *</label>
+                        <input type="text" class="form-control form-control-sm" id="playlistName" required>
                     </div>
-                    <div class="col-md-6">
-                        <div class="mb-3">
-                            <label for="playlistDescription" class="form-label">Description</label>
-                            <textarea class="form-control" id="playlistDescription" rows="2" placeholder="Describe your playlist..."></textarea>
-                        </div>
+                    <div class="col-md-8">
+                        <label for="playlistDescription" class="form-label mb-1">Description</label>
+                        <input type="text" class="form-control form-control-sm" id="playlistDescription" placeholder="Describe your playlist...">
                     </div>
                 </div>
             </div>
@@ -92,44 +85,222 @@
     </div>
 </div>
 
-<!-- Song Selection Modal -->
-<div class="modal fade" id="songSelectorModal" tabindex="-1">
-    <div class="modal-dialog modal-xl">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">Add Songs to Playlist</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+<!-- Advanced Song Search Component -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-search me-2"></i>Song Search & Library
+                    </h5>
+                    <div class="btn-group btn-group-sm">
+                        <button type="button" class="btn btn-outline-secondary" onclick="clearSearchFilters()">
+                            <i class="fas fa-times"></i> Clear Filters
+                        </button>
+                        <button type="button" class="btn btn-outline-primary" onclick="applySearchFilters()">
+                            <i class="fas fa-filter"></i> Apply Filters
+                        </button>
+                    </div>
+                </div>
             </div>
-            <div class="modal-body">
-                <!-- Search and Filter Controls -->
+            <div class="card-body">
+                <!-- Basic Search -->
                 <div class="row mb-3">
-                    <div class="col-md-6">
-                        <input type="text" class="form-control" id="songSearchInput" placeholder="Search songs...">
+                    <div class="col-md-3">
+                        <label class="form-label small">Text Search</label>
+                        <input type="text" class="form-control form-control-sm" id="searchText" placeholder="Song name, artist, album...">
                     </div>
                     <div class="col-md-3">
-                        <select class="form-select" id="artistFilter">
+                        <label class="form-label small">Artist</label>
+                        <select class="form-select form-select-sm" id="searchArtist">
                             <option value="">All Artists</option>
                         </select>
                     </div>
                     <div class="col-md-3">
-                        <select class="form-select" id="albumFilter">
+                        <label class="form-label small">Album</label>
+                        <select class="form-select form-select-sm" id="searchAlbum">
                             <option value="">All Albums</option>
                         </select>
                     </div>
+                    <div class="col-md-3">
+                        <label class="form-label small">Genre</label>
+                        <select class="form-select form-select-sm" id="searchGenre">
+                            <option value="">All Genres</option>
+                        </select>
+                    </div>
                 </div>
-                
-                <!-- Songs List -->
+
+                <!-- Advanced Filters -->
+                <div class="row">
+                    <!-- Audio Features -->
+                    <div class="col-lg-6">
+                        <h6 class="fw-bold mb-2 text-primary">Audio Features</h6>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">Energy</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="range" class="form-range" id="energyMin" min="0" max="1" step="0.1" value="0">
+                                    <span class="small text-muted">to</span>
+                                    <input type="range" class="form-range" id="energyMax" min="0" max="1" step="0.1" value="1">
+                                </div>
+                                <div class="d-flex justify-content-between small text-muted">
+                                    <span id="energyMinValue">0.0</span>
+                                    <span id="energyMaxValue">1.0</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Valence (Mood)</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="range" class="form-range" id="valenceMin" min="0" max="1" step="0.1" value="0">
+                                    <span class="small text-muted">to</span>
+                                    <input type="range" class="form-range" id="valenceMax" min="0" max="1" step="0.1" value="1">
+                                </div>
+                                <div class="d-flex justify-content-between small text-muted">
+                                    <span id="valenceMinValue">0.0</span>
+                                    <span id="valenceMaxValue">1.0</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Danceability</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="range" class="form-range" id="danceabilityMin" min="0" max="1" step="0.1" value="0">
+                                    <span class="small text-muted">to</span>
+                                    <input type="range" class="form-range" id="danceabilityMax" min="0" max="1" step="0.1" value="1">
+                                </div>
+                                <div class="d-flex justify-content-between small text-muted">
+                                    <span id="danceabilityMinValue">0.0</span>
+                                    <span id="danceabilityMaxValue">1.0</span>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Tempo (BPM)</label>
+                                <div class="d-flex align-items-center gap-2">
+                                    <input type="range" class="form-range" id="tempoMin" min="60" max="200" step="5" value="60">
+                                    <span class="small text-muted">to</span>
+                                    <input type="range" class="form-range" id="tempoMax" min="60" max="200" step="5" value="200">
+                                </div>
+                                <div class="d-flex justify-content-between small text-muted">
+                                    <span id="tempoMinValue">60</span>
+                                    <span id="tempoMaxValue">200</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Metadata and Tags -->
+                    <div class="col-lg-6">
+                        <h6 class="fw-bold mb-2 text-info">Metadata & Tags</h6>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">Year Range</label>
+                                <div class="d-flex gap-2">
+                                    <input type="number" class="form-control form-control-sm" id="yearMin" placeholder="From" min="1900" max="2030">
+                                    <input type="number" class="form-control form-control-sm" id="yearMax" placeholder="To" min="1900" max="2030">
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Duration (seconds)</label>
+                                <div class="d-flex gap-2">
+                                    <input type="number" class="form-control form-control-sm" id="durationMin" placeholder="Min" min="0" step="30">
+                                    <input type="number" class="form-control form-control-sm" id="durationMax" placeholder="Max" min="0" step="30">
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">Path Filter</label>
+                                <input type="text" class="form-control form-control-sm" id="searchPath" placeholder="Folder or path pattern...">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small">Tags</label>
+                                <div id="searchTags" class="tags-container">
+                                    <!-- Tag checkboxes will be loaded here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Search Results Summary -->
+                <div class="mt-3 pt-3 border-top">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>
+                            Found: <span id="searchResultCount" class="fw-bold text-primary">0</span> songs
+                        </span>
+                        <div class="d-flex gap-2 align-items-center">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="selectAllResults">
+                                <label class="form-check-label small" for="selectAllResults">
+                                    Select All Results
+                                </label>
+                            </div>
+                            <button type="button" class="btn btn-success btn-sm" onclick="addSelectedSongs()" id="addSelectedBtn" disabled>
+                                <i class="fas fa-plus"></i> Add Selected to Playlist
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Filtered Songs Table -->
+<div class="row mt-3">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0">
+                    <i class="fas fa-list me-2"></i>Song Library
+                </h6>
+            </div>
+            <div class="card-body p-0">
+                <div style="max-height: 500px; overflow-y: auto;">
+                    <table class="table table-sm table-hover mb-0" id="songsTable">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th width="40"><input type="checkbox" id="selectAllSongs"></th>
+                                <th>Song</th>
+                                <th>Artist</th>
+                                <th>Album</th>
+                                <th>Duration</th>
+                                <th>Audio Features</th>
+                                <th>Tags</th>
+                            </tr>
+                        </thead>
+                        <tbody id="songsTableBody">
+                            <!-- Songs will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Song Selection Modal (Simplified) -->
+<div class="modal fade" id="songSelectorModal" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Quick Add Songs</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <input type="text" class="form-control" id="quickSearchInput" placeholder="Search songs quickly...">
+                </div>
                 <div style="max-height: 400px; overflow-y: auto;">
-                    <div id="availableSongsList">
-                        <!-- Available songs will be loaded here -->
+                    <div id="quickSongsList">
+                        <!-- Quick songs list will be loaded here -->
                     </div>
                 </div>
             </div>
             <div class="modal-footer">
-                <span id="selectedSongsCount" class="me-auto text-muted">0 songs selected</span>
+                <span id="quickSelectedCount" class="me-auto text-muted">0 songs selected</span>
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                <button type="button" class="btn btn-primary" onclick="addSelectedSongs()">
-                    <i class="fas fa-plus"></i> Add Selected Songs
+                <button type="button" class="btn btn-primary" onclick="addQuickSelectedSongs()">
+                    <i class="fas fa-plus"></i> Add Selected
                 </button>
             </div>
         </div>
@@ -221,7 +392,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Get playlist ID from URL (if editing)
     const path = window.location.pathname;
     const pathParts = path.split('/');
-    if (pathParts.length > 3 && pathParts[3] !== 'edit') {
+    if (pathParts.length > 3 && pathParts[3] !== 'create') {
         playlistId = parseInt(pathParts[3]);
     }
     
@@ -237,6 +408,44 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Load available songs for song selector
     loadAvailableSongs();
+    
+    // Add select all songs event listener
+    document.getElementById('selectAllSongs').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.song-checkbox');
+        checkboxes.forEach(cb => cb.checked = this.checked);
+        updateSelectedSongsCount();
+    });
+    
+    // Add select all results event listener
+    document.getElementById('selectAllResults').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.song-checkbox');
+        checkboxes.forEach(cb => cb.checked = this.checked);
+        updateSelectedSongsCount();
+    });
+    
+    // Add real-time search
+    document.getElementById('searchText').addEventListener('input', debounce(applySearchFilters, 300));
+    document.getElementById('searchArtist').addEventListener('change', applySearchFilters);
+    document.getElementById('searchAlbum').addEventListener('change', applySearchFilters);
+    document.getElementById('searchGenre').addEventListener('change', applySearchFilters);
+    document.getElementById('searchPath').addEventListener('input', debounce(applySearchFilters, 300));
+    
+    // Add range slider real-time updates
+    ['energyMin', 'energyMax', 'valenceMin', 'valenceMax', 'danceabilityMin', 'danceabilityMax', 'tempoMin', 'tempoMax'].forEach(id => {
+        document.getElementById(id).addEventListener('input', debounce(applySearchFilters, 100));
+    });
+    
+    // Year and duration inputs
+    ['yearMin', 'yearMax', 'durationMin', 'durationMax'].forEach(id => {
+        document.getElementById(id).addEventListener('input', debounce(applySearchFilters, 300));
+    });
+    
+    // Tag checkboxes will be handled dynamically when they're loaded
+    document.addEventListener('change', function(e) {
+        if (e.target.matches('.tags-container input[type="checkbox"]')) {
+            applySearchFilters();
+        }
+    });
 });
 
 async function loadPlaylistForEditing() {
@@ -278,10 +487,268 @@ async function loadAvailableSongs() {
         const response = await fetch('/api/songs');
         if (!response.ok) throw new Error('Failed to load songs');
         availableSongs = await response.json();
+        
+        // Load metadata for filters
+        await loadSearchMetadata();
+        
+        // Initialize search
+        displayFilteredSongs(availableSongs);
+        
     } catch (error) {
         console.error('Error loading songs:', error);
         notificationSystem.error("Error", 'Failed to load available songs.');
     }
+}
+
+async function loadSearchMetadata() {
+    try {
+        // Load tags
+        const tagsResponse = await fetch('/api/tags');
+        const tags = await tagsResponse.json();
+        
+        // Populate search filters
+        populateSearchFilters(tags);
+        
+    } catch (error) {
+        console.error('Error loading search metadata:', error);
+    }
+}
+
+function populateSearchFilters(tags) {
+    // Get unique values from songs
+    const artists = [...new Set(availableSongs.map(s => s.artist).filter(Boolean))].sort();
+    const albums = [...new Set(availableSongs.map(s => s.album).filter(Boolean))].sort();
+    const genres = [...new Set(availableSongs.map(s => s.genre).filter(Boolean))].sort();
+    
+    // Populate artist dropdown
+    const artistSelect = document.getElementById('searchArtist');
+    artistSelect.innerHTML = '<option value="">All Artists</option>' +
+        artists.map(artist => `<option value="${artist}">${artist}</option>`).join('');
+    
+    // Populate album dropdown
+    const albumSelect = document.getElementById('searchAlbum');
+    albumSelect.innerHTML = '<option value="">All Albums</option>' +
+        albums.map(album => `<option value="${album}">${album}</option>`).join('');
+    
+    // Populate genre dropdown
+    const genreSelect = document.getElementById('searchGenre');
+    genreSelect.innerHTML = '<option value="">All Genres</option>' +
+        genres.map(genre => `<option value="${genre}">${genre}</option>`).join('');
+    
+    // Populate tags
+    const tagsContainer = document.getElementById('searchTags');
+    if (tags && tags.length > 0) {
+        tagsContainer.innerHTML = tags.map(tag => `
+            <div class="form-check form-check-inline">
+                <input class="form-check-input" type="checkbox" value="${tag.id}" id="tag-${tag.id}">
+                <label class="form-check-label" for="tag-${tag.id}">
+                    ${tag.name}
+                </label>
+            </div>
+        `).join('');
+    } else {
+        tagsContainer.innerHTML = '<span class="text-muted small">No tags available</span>';
+    }
+    
+    // Add range slider event listeners
+    setupRangeSliders();
+}
+
+function setupRangeSliders() {
+    const rangeInputs = [
+        { min: 'energyMin', max: 'energyMax', minDisplay: 'energyMinValue', maxDisplay: 'energyMaxValue' },
+        { min: 'valenceMin', max: 'valenceMax', minDisplay: 'valenceMinValue', maxDisplay: 'valenceMaxValue' },
+        { min: 'danceabilityMin', max: 'danceabilityMax', minDisplay: 'danceabilityMinValue', maxDisplay: 'danceabilityMaxValue' },
+        { min: 'tempoMin', max: 'tempoMax', minDisplay: 'tempoMinValue', maxDisplay: 'tempoMaxValue' }
+    ];
+    
+    rangeInputs.forEach(({ min, max, minDisplay, maxDisplay }) => {
+        const minInput = document.getElementById(min);
+        const maxInput = document.getElementById(max);
+        const minDisplaySpan = document.getElementById(minDisplay);
+        const maxDisplaySpan = document.getElementById(maxDisplay);
+        
+        minInput.addEventListener('input', () => {
+            minDisplaySpan.textContent = minInput.value;
+            if (parseFloat(minInput.value) > parseFloat(maxInput.value)) {
+                maxInput.value = minInput.value;
+                maxDisplaySpan.textContent = maxInput.value;
+            }
+        });
+        
+        maxInput.addEventListener('input', () => {
+            maxDisplaySpan.textContent = maxInput.value;
+            if (parseFloat(maxInput.value) < parseFloat(minInput.value)) {
+                minInput.value = maxInput.value;
+                minDisplaySpan.textContent = minInput.value;
+            }
+        });
+    });
+}
+
+function displayFilteredSongs(songs) {
+    const tbody = document.getElementById('songsTableBody');
+    const manualSongIds = new Set(manualSongs.map(s => s.id));
+    
+    // Filter out already added songs
+    const filteredSongs = songs.filter(song => !manualSongIds.has(song.id));
+    
+    // Update count
+    document.getElementById('searchResultCount').textContent = filteredSongs.length;
+    
+    tbody.innerHTML = filteredSongs.map(song => `
+        <tr>
+            <td>
+                <input type="checkbox" class="form-check-input song-checkbox" value="${song.id}" onchange="updateSelectedSongsCount()">
+            </td>
+            <td>
+                <div class="fw-bold">${song.display_name}</div>
+                <div class="text-muted small">${song.year || 'Unknown Year'}</div>
+            </td>
+            <td>${song.artist || 'Unknown Artist'}</td>
+            <td>${song.album || 'Unknown Album'}</td>
+            <td>${song.duration ? formatDuration(song.duration) : ''}</td>
+            <td>
+                <div class="small">
+                    ${song.energy !== null ? `E:${(song.energy * 100).toFixed(0)}%` : ''}
+                    ${song.valence !== null ? `V:${(song.valence * 100).toFixed(0)}%` : ''}
+                    ${song.danceability !== null ? `D:${(song.danceability * 100).toFixed(0)}%` : ''}
+                    ${song.tempo ? `${Math.round(song.tempo)}bpm` : ''}
+                </div>
+            </td>
+            <td>
+                <div class="small">
+                    ${song.tags ? song.tags.map(tag => `<span class="badge bg-secondary">${tag.name}</span>`).join(' ') : ''}
+                </div>
+            </td>
+        </tr>
+    `).join('');
+    
+    // Clear select all checkbox
+    document.getElementById('selectAllSongs').checked = false;
+}
+
+function applySearchFilters() {
+    const filters = getSearchFilters();
+    const filteredSongs = availableSongs.filter(song => matchesFilters(song, filters));
+    displayFilteredSongs(filteredSongs);
+}
+
+function getSearchFilters() {
+    return {
+        text: document.getElementById('searchText').value.toLowerCase().trim(),
+        artist: document.getElementById('searchArtist').value,
+        album: document.getElementById('searchAlbum').value,
+        genre: document.getElementById('searchGenre').value,
+        yearMin: parseInt(document.getElementById('yearMin').value) || null,
+        yearMax: parseInt(document.getElementById('yearMax').value) || null,
+        durationMin: parseInt(document.getElementById('durationMin').value) || null,
+        durationMax: parseInt(document.getElementById('durationMax').value) || null,
+        energyMin: parseFloat(document.getElementById('energyMin').value),
+        energyMax: parseFloat(document.getElementById('energyMax').value),
+        valenceMin: parseFloat(document.getElementById('valenceMin').value),
+        valenceMax: parseFloat(document.getElementById('valenceMax').value),
+        danceabilityMin: parseFloat(document.getElementById('danceabilityMin').value),
+        danceabilityMax: parseFloat(document.getElementById('danceabilityMax').value),
+        tempoMin: parseFloat(document.getElementById('tempoMin').value),
+        tempoMax: parseFloat(document.getElementById('tempoMax').value),
+        path: document.getElementById('searchPath').value.toLowerCase().trim(),
+        tags: Array.from(document.querySelectorAll('.tags-container input:checked')).map(cb => parseInt(cb.value))
+    };
+}
+
+function matchesFilters(song, filters) {
+    // Text search
+    if (filters.text) {
+        const searchText = `${song.display_name} ${song.artist} ${song.album}`.toLowerCase();
+        if (!searchText.includes(filters.text)) return false;
+    }
+    
+    // Basic metadata filters
+    if (filters.artist && song.artist !== filters.artist) return false;
+    if (filters.album && song.album !== filters.album) return false;
+    if (filters.genre && song.genre !== filters.genre) return false;
+    
+    // Year range
+    if (filters.yearMin && (!song.year || song.year < filters.yearMin)) return false;
+    if (filters.yearMax && (!song.year || song.year > filters.yearMax)) return false;
+    
+    // Duration range
+    if (filters.durationMin && (!song.duration || song.duration < filters.durationMin)) return false;
+    if (filters.durationMax && (!song.duration || song.duration > filters.durationMax)) return false;
+    
+    // Audio features
+    if (song.energy !== null) {
+        if (song.energy < filters.energyMin || song.energy > filters.energyMax) return false;
+    }
+    if (song.valence !== null) {
+        if (song.valence < filters.valenceMin || song.valence > filters.valenceMax) return false;
+    }
+    if (song.danceability !== null) {
+        if (song.danceability < filters.danceabilityMin || song.danceability > filters.danceabilityMax) return false;
+    }
+    if (song.tempo !== null) {
+        if (song.tempo < filters.tempoMin || song.tempo > filters.tempoMax) return false;
+    }
+    
+    // Path filter
+    if (filters.path && !song.file_path.toLowerCase().includes(filters.path)) return false;
+    
+    // Tags filter
+    if (filters.tags.length > 0) {
+        const songTagIds = song.tags ? song.tags.map(tag => tag.id) : [];
+        if (!filters.tags.some(tagId => songTagIds.includes(tagId))) return false;
+    }
+    
+    return true;
+}
+
+function clearSearchFilters() {
+    // Clear text inputs
+    document.getElementById('searchText').value = '';
+    document.getElementById('searchPath').value = '';
+    document.getElementById('yearMin').value = '';
+    document.getElementById('yearMax').value = '';
+    document.getElementById('durationMin').value = '';
+    document.getElementById('durationMax').value = '';
+    
+    // Reset dropdowns
+    document.getElementById('searchArtist').value = '';
+    document.getElementById('searchAlbum').value = '';
+    document.getElementById('searchGenre').value = '';
+    
+    // Reset range sliders
+    document.getElementById('energyMin').value = 0;
+    document.getElementById('energyMax').value = 1;
+    document.getElementById('valenceMin').value = 0;
+    document.getElementById('valenceMax').value = 1;
+    document.getElementById('danceabilityMin').value = 0;
+    document.getElementById('danceabilityMax').value = 1;
+    document.getElementById('tempoMin').value = 60;
+    document.getElementById('tempoMax').value = 200;
+    
+    // Update display values
+    document.getElementById('energyMinValue').textContent = '0.0';
+    document.getElementById('energyMaxValue').textContent = '1.0';
+    document.getElementById('valenceMinValue').textContent = '0.0';
+    document.getElementById('valenceMaxValue').textContent = '1.0';
+    document.getElementById('danceabilityMinValue').textContent = '0.0';
+    document.getElementById('danceabilityMaxValue').textContent = '1.0';
+    document.getElementById('tempoMinValue').textContent = '60';
+    document.getElementById('tempoMaxValue').textContent = '200';
+    
+    // Clear tag checkboxes
+    document.querySelectorAll('.tags-container input').forEach(cb => cb.checked = false);
+    
+    // Reset to show all songs
+    displayFilteredSongs(availableSongs);
+}
+
+function formatDuration(seconds) {
+    if (!seconds) return '';
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
 }
 
 function renderManualSongs() {
@@ -387,40 +854,51 @@ function updateCounts() {
 // Song selector functions
 function openSongSelector() {
     const modal = new bootstrap.Modal(document.getElementById('songSelectorModal'));
-    populateSongSelector();
+    
+    // Initialize search filters if not already done
+    if (availableSongs.length > 0) {
+        displayFilteredSongs(availableSongs);
+    }
+    
     modal.show();
 }
 
-function populateSongSelector() {
-    const container = document.getElementById('availableSongsList');
-    const manualSongIds = new Set(manualSongs.map(s => s.id));
-    
-    const filteredSongs = availableSongs.filter(song => !manualSongIds.has(song.id));
-    
-    container.innerHTML = filteredSongs.map(song => `
-        <div class="form-check p-2 border-bottom">
-            <input class="form-check-input" type="checkbox" value="${song.id}" id="song-${song.id}" onchange="updateSelectedSongsCount()">
-            <label class="form-check-label d-flex justify-content-between w-100" for="song-${song.id}">
-                <div>
-                    <div class="fw-bold">${song.display_name}</div>
-                    <div class="text-muted small">${song.artist || 'Unknown Artist'} • ${song.album || 'Unknown Album'}</div>
-                </div>
-                <div class="text-muted small">
-                    ${song.duration ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0') : ''}
-                </div>
-            </label>
-        </div>
-    `).join('');
-}
-
 function updateSelectedSongsCount() {
-    const checkboxes = document.querySelectorAll('#availableSongsList input[type="checkbox"]:checked');
-    document.getElementById('selectedSongsCount').textContent = `${checkboxes.length} songs selected`;
+    const checkboxes = document.querySelectorAll('.song-checkbox:checked');
+    const count = checkboxes.length;
+    
+    // Update both modal and main button
+    document.getElementById('selectedSongsCount').textContent = `${count} songs selected`;
+    
+    // Update add selected button
+    const addBtn = document.getElementById('addSelectedBtn');
+    if (addBtn) {
+        addBtn.disabled = count === 0;
+        addBtn.innerHTML = count > 0 ? 
+            `<i class="fas fa-plus"></i> Add Selected (${count}) to Playlist` : 
+            `<i class="fas fa-plus"></i> Add Selected to Playlist`;
+    }
+    
+    // Update select all checkbox state
+    const selectAllCheckbox = document.getElementById('selectAllSongs');
+    const allCheckboxes = document.querySelectorAll('.song-checkbox');
+    selectAllCheckbox.indeterminate = count > 0 && count < allCheckboxes.length;
+    selectAllCheckbox.checked = count > 0 && count === allCheckboxes.length;
+    
+    // Update select all results checkbox
+    const selectAllResults = document.getElementById('selectAllResults');
+    selectAllResults.indeterminate = count > 0 && count < allCheckboxes.length;
+    selectAllResults.checked = count > 0 && count === allCheckboxes.length;
 }
 
 function addSelectedSongs() {
-    const checkboxes = document.querySelectorAll('#availableSongsList input[type="checkbox"]:checked');
+    const checkboxes = document.querySelectorAll('.song-checkbox:checked');
     const newSongIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+    
+    if (newSongIds.length === 0) {
+        notificationSystem.warning("No Selection", "Please select at least one song to add.");
+        return;
+    }
     
     const newSongs = availableSongs.filter(song => newSongIds.includes(song.id));
     manualSongs.push(...newSongs);
@@ -432,6 +910,19 @@ function addSelectedSongs() {
     bootstrap.Modal.getInstance(document.getElementById('songSelectorModal')).hide();
     
     notificationSystem.success("Success", `Added ${newSongs.length} songs to playlist`);
+}
+
+// Utility function for debouncing
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
 }
 
 function removeManualSong(songId) {
@@ -568,10 +1059,6 @@ function goBackToPlaylists() {
     transition: all 0.2s ease;
 }
 
-#availableSongsList {
-    max-height: 400px;
-}
-
 .form-check-label {
     cursor: pointer;
 }
@@ -591,6 +1078,128 @@ function goBackToPlaylists() {
 .criteria-section.exclude {
     border-color: #dc3545;
     background-color: #fef8f8;
+}
+
+/* Search component styles */
+.form-range {
+    height: 0.25rem;
+}
+
+.range-slider-container {
+    position: relative;
+}
+
+.song-checkbox {
+    margin: 0;
+}
+
+#songsTable {
+    font-size: 0.875rem;
+}
+
+#songsTable th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    border-bottom: 2px solid #dee2e6;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+}
+
+#songsTable td {
+    vertical-align: middle;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.badge {
+    font-size: 0.7rem;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.075);
+}
+
+/* Audio features display */
+.audio-features {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.audio-features .badge {
+    font-size: 0.65rem;
+    padding: 0.2em 0.4em;
+}
+
+/* Range slider improvements */
+.range-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.range-values {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin-top: 2px;
+}
+
+/* Search tags styling */
+.tags-container {
+    max-height: 120px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+}
+
+.tags-container .form-check {
+    margin-bottom: 0.25rem;
+    margin-right: 0.75rem;
+}
+
+.tags-container .form-check-input {
+    margin-top: 0.125rem;
+}
+
+.tags-container .form-check-label {
+    font-size: 0.875rem;
+    cursor: pointer;
+}
+
+/* Empty tags container */
+.tags-container:empty::before {
+    content: "No tags available";
+    color: #6c757d;
+    font-style: italic;
+    font-size: 0.875rem;
+}
+
+/* Modal improvements */
+.modal-xl {
+    max-width: 95%;
+}
+
+.search-results-summary {
+    background-color: #f8f9fa;
+    border-radius: 0.375rem;
+    padding: 0.75rem;
+    margin-top: 1rem;
+}
+
+/* Sticky table header */
+.table-container {
+    position: relative;
+}
+
+.sticky-top {
+    position: sticky;
+    top: 0;
+    z-index: 1020;
 }
 </style>
 {% endblock %}
