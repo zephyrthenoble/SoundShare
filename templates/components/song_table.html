@@ -1,0 +1,860 @@
+<!-- Reusable Song Table Component -->
+<!-- Usage: Include this file and call songTable.init(config) -->
+
+<div class="song-table-component" id="songTableComponent">
+    <!-- Song Table -->
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-striped song-table" id="songsTable">
+                <thead>
+                    <tr class="table-header-row">
+                        <!-- Headers will be dynamically generated -->
+                    </tr>
+                </thead>
+                <tbody>
+                    <!-- Songs will be loaded here via JavaScript -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+/* Song Table Component Styles */
+.song-table-component .table th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+}
+
+.song-table-component .table tbody tr {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.song-table-component .table tbody tr:hover {
+    background-color: rgba(0, 123, 255, 0.075);
+}
+
+.song-table-component .table tbody tr.table-secondary {
+    background-color: #e2e3e5;
+}
+
+.song-table-component .song-preview-row {
+    background-color: #f8f9fa !important;
+}
+
+.song-table-component .song-preview-row:hover {
+    background-color: #f8f9fa !important;
+}
+
+/* Mood/Audio Features Bars */
+.song-table-component .mood-bars {
+    height: 32px !important;
+    min-height: 32px !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+.song-table-component .mood-bar-container {
+    height: 8px !important;
+    min-height: 8px !important;
+    background-color: #e9ecef;
+    margin-bottom: 2px;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.song-table-component .mood-bar-container:last-child {
+    margin-bottom: 0;
+}
+
+.song-table-component .energy-bar {
+    background: linear-gradient(90deg, #ffc107 0%, #fd7e14 100%);
+    height: 8px !important;
+    min-height: 8px !important;
+    transition: width 0.3s ease;
+}
+
+.song-table-component .valence-bar {
+    background: linear-gradient(90deg, #6f42c1 0%, #0d6efd 100%);
+    height: 8px !important;
+    min-height: 8px !important;
+    transition: width 0.3s ease;
+}
+
+.song-table-component .danceability-bar {
+    background: linear-gradient(90deg, #198754 0%, #20c997 100%);
+    height: 8px !important;
+    min-height: 8px !important;
+    transition: width 0.3s ease;
+}
+
+/* Text overflow handling */
+.song-table-component .text-ellipsis {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Audio player styles */
+.song-table-component audio {
+    width: 100%;
+    height: 32px;
+}
+
+.song-table-component .segment-btn {
+    flex: 1;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.5rem;
+}
+
+.song-table-component .segment-label {
+    font-size: 0.7rem;
+    line-height: 1;
+}
+
+/* Tags display */
+.song-table-component .tag-badge {
+    font-size: 0.7rem;
+    margin-right: 0.25rem;
+    margin-bottom: 0.25rem;
+}
+</style>
+
+<script>
+// Song Table Component JavaScript
+window.songTable = (function() {
+    // Private variables for each table instance
+    const instances = new Map();
+    
+    // Initialize a song table instance
+    function init(config) {
+        const tableId = config.tableId || 'songsTable';
+        const instance = {
+            tableId: tableId,
+            songs: [],
+            filteredSongs: [],
+            selectedSongs: new Set(),
+            expandedSongId: null,
+            expandedSongRow: null,
+            currentSortField: config.defaultSort || 'display_name',
+            currentSortDirection: 'asc',
+            config: config,
+            onSelectionChange: config.onSelectionChange || function() {},
+            onSongClick: config.onSongClick || function() {},
+            onEditSong: config.onEditSong || function() {},
+            onManageTags: config.onManageTags || function() {}
+        };
+        
+        instances.set(tableId, instance);
+        
+        // Set the table ID
+        const table = document.querySelector('.song-table');
+        if (table) {
+            table.id = tableId;
+        }
+        
+        // Generate table headers
+        generateTableHeaders(tableId);
+        
+        return instance;
+    }
+    
+    // Generate table headers based on configuration
+    function generateTableHeaders(tableId) {
+        const instance = instances.get(tableId);
+        if (!instance) return;
+        
+        const headerRow = document.querySelector(`#${tableId} .table-header-row`);
+        if (!headerRow) return;
+        
+        let headersHTML = '';
+        
+        // Checkbox column
+        if (instance.config.showCheckboxes) {
+            headersHTML += `
+                <th width="50">
+                    <input type="checkbox" class="select-all-checkbox" onchange="songTable.toggleSelectAll('${tableId}')">
+                </th>
+            `;
+        }
+        
+        // Name column (always shown)
+        headersHTML += `
+            <th width="250" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'display_name')">
+                Name <i class="fas fa-sort" id="sort-display_name-${tableId}"></i>
+            </th>
+        `;
+        
+        // Folder column
+        if (instance.config.showFolder) {
+            headersHTML += `
+                <th width="140" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'folder')">
+                    Folder <i class="fas fa-sort" id="sort-folder-${tableId}"></i>
+                </th>
+            `;
+        }
+        
+        // Album column (always shown)
+        headersHTML += `
+            <th width="160" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'album')">
+                Album <i class="fas fa-sort" id="sort-album-${tableId}"></i>
+            </th>
+        `;
+        
+        // Duration column (always shown)
+        headersHTML += `
+            <th width="80" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'duration')">
+                Duration <i class="fas fa-sort" id="sort-duration-${tableId}"></i>
+            </th>
+        `;
+        
+        // Tempo column
+        if (instance.config.showAudioFeatures) {
+            headersHTML += `
+                <th width="100" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'tempo')">
+                    Tempo <i class="fas fa-sort" id="sort-tempo-${tableId}"></i>
+                </th>
+            `;
+        }
+        
+        // Created At column
+        if (instance.config.showCreatedAt) {
+            headersHTML += `
+                <th width="140" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'created_at')">
+                    Created At <i class="fas fa-sort" id="sort-created_at-${tableId}"></i>
+                </th>
+            `;
+        }
+        
+        // Audio Features column
+        if (instance.config.showAudioFeatures) {
+            headersHTML += `
+                <th width="180">Audio Features</th>
+            `;
+        }
+        
+        // Tags column
+        if (instance.config.showTags) {
+            headersHTML += `
+                <th width="150">Tags</th>
+            `;
+        }
+        
+        headerRow.innerHTML = headersHTML;
+    }
+    
+    // Set songs data for a table instance
+    function setSongs(tableId, songs) {
+        const instance = instances.get(tableId);
+        if (instance) {
+            instance.songs = songs;
+            instance.filteredSongs = [...songs];
+            renderTable(tableId);
+        }
+    }
+    
+    // Filter songs for a table instance
+    function filterSongs(tableId, filterFn) {
+        const instance = instances.get(tableId);
+        if (instance) {
+            instance.filteredSongs = instance.songs.filter(filterFn);
+            renderTable(tableId);
+        }
+    }
+    
+    // Render the table
+    function renderTable(tableId) {
+        const instance = instances.get(tableId);
+        if (!instance) return;
+        
+        const tbody = document.querySelector(`#${tableId} tbody`);
+        if (!tbody) return;
+        
+        tbody.innerHTML = '';
+        
+        instance.filteredSongs.forEach(song => {
+            const row = document.createElement('tr');
+            row.dataset.songId = song.id;
+            row.style.cursor = 'pointer';
+            
+            const isSelected = instance.selectedSongs.has(song.id);
+            
+            // Build row HTML based on configuration
+            let rowHTML = '';
+            
+            // Checkbox column
+            if (instance.config.showCheckboxes) {
+                rowHTML += `
+                    <td onclick="event.stopPropagation()">
+                        <input type="checkbox" class="song-checkbox" data-song-id="${song.id}" 
+                               ${isSelected ? 'checked' : ''} onchange="songTable.toggleSongSelection('${tableId}', ${song.id})">
+                    </td>
+                `;
+            }
+            
+            // Name column
+            rowHTML += `
+                <td class="text-ellipsis" title="${song.display_name}" style="max-width: 250px;">
+                    ${song.display_name}
+                </td>
+            `;
+            
+            // Folder column
+            if (instance.config.showFolder) {
+                const folder = getFolder(song.file_path);
+                rowHTML += `
+                    <td class="text-ellipsis" title="${folder}" style="max-width: 140px;">
+                        <small class="text-muted">${folder}</small>
+                    </td>
+                `;
+            }
+            
+            // Album column
+            rowHTML += `
+                <td class="text-ellipsis" title="${song.album || ''}" style="max-width: 160px;">
+                    ${song.album || ''}
+                </td>
+            `;
+            
+            // Duration column
+            rowHTML += `
+                <td><small>${formatDuration(song.duration)}</small></td>
+            `;
+            
+            // Tempo column
+            if (instance.config.showAudioFeatures) {
+                rowHTML += `
+                    <td><small>${song.tempo ? Math.round(song.tempo) + ' BPM' : ''}</small></td>
+                `;
+            }
+            
+            // Created At column
+            if (instance.config.showCreatedAt) {
+                rowHTML += `
+                    <td><small>${formatDateTime(song.created_at)}</small></td>
+                `;
+            }
+            
+            // Audio Features column
+            if (instance.config.showAudioFeatures) {
+                const energy = song.energy !== null && song.energy !== undefined ? Math.max((song.energy * 100).toFixed(0), 2) : '0';
+                const valence = song.valence !== null && song.valence !== undefined ? Math.max((song.valence * 100).toFixed(0), 2) : '0';
+                const danceability = song.danceability !== null && song.danceability !== undefined ? Math.max((song.danceability * 100).toFixed(0), 2) : '0';
+                
+                rowHTML += `
+                    <td style="padding: 4px; height: 40px; vertical-align: middle;">
+                        <div class="mood-bars" title="Energy: ${energy}% | Valence: ${valence}% | Danceability: ${danceability}%">
+                            <div class="mood-bar-container">
+                                <div class="energy-bar" style="width: ${energy}%;" title="Energy: ${energy}%"></div>
+                            </div>
+                            <div class="mood-bar-container">
+                                <div class="valence-bar" style="width: ${valence}%;" title="Valence: ${valence}%"></div>
+                            </div>
+                            <div class="mood-bar-container">
+                                <div class="danceability-bar" style="width: ${danceability}%;" title="Danceability: ${danceability}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                `;
+            }
+            
+            // Tags column
+            if (instance.config.showTags) {
+                const tagsHTML = song.tags && song.tags.length > 0 ? 
+                    song.tags.map(tag => `<span class="badge bg-secondary tag-badge">${tag.name}</span>`).join('') : 
+                    '<span class="text-muted small">No tags</span>';
+                
+                rowHTML += `
+                    <td>
+                        <div class="d-flex flex-wrap">
+                            ${tagsHTML}
+                        </div>
+                    </td>
+                `;
+            }
+            
+            row.innerHTML = rowHTML;
+            
+            // Add click event to row
+            row.addEventListener('click', (e) => {
+                if (!e.target.closest('input[type="checkbox"]')) {
+                    previewSong(tableId, song.id, row);
+                    instance.onSongClick(song, row);
+                }
+            });
+            
+            tbody.appendChild(row);
+        });
+        
+        updateSortIndicators(tableId);
+    }
+    
+    // Toggle song selection
+    function toggleSongSelection(tableId, songId) {
+        const instance = instances.get(tableId);
+        if (!instance) return;
+        
+        if (instance.selectedSongs.has(songId)) {
+            instance.selectedSongs.delete(songId);
+        } else {
+            instance.selectedSongs.add(songId);
+        }
+        
+        updateSelectAllCheckbox(tableId);
+        instance.onSelectionChange(Array.from(instance.selectedSongs));
+    }
+    
+    // Toggle select all
+    function toggleSelectAll(tableId) {
+        const instance = instances.get(tableId);
+        if (!instance) return;
+        
+        const selectAllCheckbox = document.querySelector(`#${tableId} .select-all-checkbox`);
+        const isChecked = selectAllCheckbox.checked;
+        
+        if (isChecked) {
+            // Select all visible songs
+            instance.filteredSongs.forEach(song => {
+                instance.selectedSongs.add(song.id);
+            });
+        } else {
+            // Deselect all songs
+            instance.selectedSongs.clear();
+        }
+        
+        // Update individual checkboxes
+        const checkboxes = document.querySelectorAll(`#${tableId} .song-checkbox`);
+        checkboxes.forEach(checkbox => {
+            const songId = parseInt(checkbox.dataset.songId);
+            checkbox.checked = instance.selectedSongs.has(songId);
+        });
+        
+        instance.onSelectionChange(Array.from(instance.selectedSongs));
+    }
+    
+    // Update select all checkbox state
+    function updateSelectAllCheckbox(tableId) {
+        const instance = instances.get(tableId);
+        if (!instance) return;
+        
+        const selectAllCheckbox = document.querySelector(`#${tableId} .select-all-checkbox`);
+        if (!selectAllCheckbox) return;
+        
+        const visibleSongIds = instance.filteredSongs.map(s => s.id);
+        const selectedVisibleCount = visibleSongIds.filter(id => instance.selectedSongs.has(id)).length;
+        
+        selectAllCheckbox.indeterminate = selectedVisibleCount > 0 && selectedVisibleCount < visibleSongIds.length;
+        selectAllCheckbox.checked = selectedVisibleCount > 0 && selectedVisibleCount === visibleSongIds.length;
+    }
+    
+    // Sort table
+    function sortTable(tableId, field) {
+        const instance = instances.get(tableId);
+        if (!instance) return;
+        
+        if (instance.currentSortField === field) {
+            instance.currentSortDirection = instance.currentSortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+            instance.currentSortField = field;
+            instance.currentSortDirection = 'asc';
+        }
+        
+        instance.filteredSongs.sort((a, b) => {
+            let aVal = a[field] || '';
+            let bVal = b[field] || '';
+            
+            // Handle special cases
+            if (field === 'duration' || field === 'tempo') {
+                aVal = parseFloat(aVal) || 0;
+                bVal = parseFloat(bVal) || 0;
+            } else if (field === 'created_at') {
+                aVal = new Date(aVal).getTime() || 0;
+                bVal = new Date(bVal).getTime() || 0;
+            } else {
+                aVal = String(aVal).toLowerCase();
+                bVal = String(bVal).toLowerCase();
+            }
+            
+            if (aVal < bVal) return instance.currentSortDirection === 'asc' ? -1 : 1;
+            if (aVal > bVal) return instance.currentSortDirection === 'asc' ? 1 : -1;
+            return 0;
+        });
+        
+        renderTable(tableId);
+    }
+    
+    // Update sort indicators
+    function updateSortIndicators(tableId) {
+        const instance = instances.get(tableId);
+        if (!instance) return;
+        
+        // Reset all sort indicators
+        const sortIcons = document.querySelectorAll(`#${tableId} [id^="sort-"]`);
+        sortIcons.forEach(icon => {
+            icon.className = 'fas fa-sort';
+        });
+        
+        // Set current sort indicator
+        const currentIcon = document.getElementById(`sort-${instance.currentSortField}-${tableId}`);
+        if (currentIcon) {
+            currentIcon.className = instance.currentSortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+        }
+    }
+    
+    // Preview song functionality
+    function previewSong(tableId, songId, rowElement) {
+        const instance = instances.get(tableId);
+        if (!instance) return;
+        
+        // Check if clicking on the already expanded row
+        if (instance.expandedSongId === songId) {
+            closePreview(tableId);
+            return;
+        }
+        
+        // Close any existing preview
+        closePreview(tableId);
+        
+        // Set new expanded state
+        instance.expandedSongId = songId;
+        instance.expandedSongRow = rowElement;
+        
+        // Highlight the current row
+        if (rowElement) {
+            rowElement.classList.add('table-secondary');
+        }
+        
+        // Get song data
+        const song = instance.filteredSongs.find(s => s.id === songId);
+        if (!song) {
+            console.error('Song not found');
+            return;
+        }
+        
+        // Create preview row
+        const previewRow = createPreviewRow(tableId, song);
+        
+        // Insert preview row after the current row
+        rowElement.parentNode.insertBefore(previewRow, rowElement.nextSibling);
+        
+        // Setup audio player
+        setupAudioPlayer(tableId, songId);
+    }
+    
+    // Close preview
+    function closePreview(tableId) {
+        const instance = instances.get(tableId);
+        if (!instance) return;
+        
+        // Stop all audio
+        stopAllAudio(tableId);
+        
+        // Remove preview rows
+        const existingPreviews = document.querySelectorAll(`#${tableId} .song-preview-row`);
+        existingPreviews.forEach(preview => {
+            const audioElements = preview.querySelectorAll('audio');
+            audioElements.forEach(audio => {
+                audio.pause();
+                audio.src = '';
+            });
+            preview.remove();
+        });
+        
+        // Remove highlighting
+        if (instance.expandedSongRow) {
+            instance.expandedSongRow.classList.remove('table-secondary');
+        }
+        
+        // Reset state
+        instance.expandedSongId = null;
+        instance.expandedSongRow = null;
+    }
+    
+    // Create preview row
+    function createPreviewRow(tableId, song) {
+        const instance = instances.get(tableId);
+        const columnCount = getColumnCount(instance.config);
+        
+        const previewRow = document.createElement('tr');
+        previewRow.className = 'song-preview-row';
+        previewRow.innerHTML = `
+            <td colspan="${columnCount}">
+                <div class="card border-0 bg-light">
+                    <div class="card-body py-3">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <h6 class="mb-0">${song.display_name}</h6>
+                                    ${instance.config.showEditButton ? `
+                                        <button class="btn btn-sm btn-outline-secondary" onclick="songTable.editSong('${tableId}', ${song.id}); event.stopPropagation();">
+                                            <i class="fas fa-edit"></i> Edit
+                                        </button>
+                                    ` : ''}
+                                </div>
+                                <div class="text-muted small mb-2">
+                                    <div><strong>Artist:</strong> ${song.artist || 'Unknown'}</div>
+                                    <div><strong>Album:</strong> ${song.album || 'Unknown'}</div>
+                                    <div><strong>Year:</strong> ${song.year || 'Unknown'}</div>
+                                    <div><strong>Duration:</strong> ${formatDuration(song.duration)}</div>
+                                    ${song.tempo ? `<div><strong>Tempo:</strong> ${Math.round(song.tempo)} BPM</div>` : ''}
+                                    ${song.key ? `<div><strong>Key:</strong> ${song.key}</div>` : ''}
+                                    ${song.file_size ? `<div><strong>File Size:</strong> ${Math.round(song.file_size / 1024)} KB</div>` : ''}
+                                </div>
+                                ${instance.config.showTags && song.tags ? `
+                                    <div class="mt-2">
+                                        <div class="d-flex align-items-center mb-2">
+                                            <strong class="me-2 small">Tags:</strong>
+                                            ${instance.config.showTagManagement ? `
+                                                <button class="btn btn-sm btn-outline-success" onclick="songTable.manageTags('${tableId}', ${song.id}); event.stopPropagation();" title="Add/Remove Tags">
+                                                    <i class="fas fa-plus"></i>
+                                                </button>
+                                            ` : ''}
+                                        </div>
+                                        <div class="d-flex flex-wrap gap-1">
+                                            ${song.tags && song.tags.length > 0 ? 
+                                                song.tags.map(tag => `<span class="badge bg-secondary">${tag.name}</span>`).join('') : 
+                                                '<span class="text-muted small">No tags assigned</span>'
+                                            }
+                                        </div>
+                                    </div>
+                                ` : ''}
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-2">
+                                    <small class="text-muted">Song Preview</small>
+                                </div>
+                                <div class="mb-3">
+                                    <audio id="previewPlayer-${tableId}-${song.id}" controls class="w-100"></audio>
+                                </div>
+                                <div class="mb-2" id="previewControls-${tableId}-${song.id}" style="display: none;">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <small class="text-muted">Preview Mode</small>
+                                        <button id="autoPlayToggle-${tableId}-${song.id}" class="btn btn-sm btn-danger" onclick="songTable.toggleAutoPlay('${tableId}', ${song.id})">
+                                            Stop Auto
+                                        </button>
+                                    </div>
+                                    <div class="mb-2" id="segmentBar-${tableId}-${song.id}">
+                                        <small class="text-muted">Preview Segments</small>
+                                        <div class="btn-group w-100 mb-2" role="group">
+                                            <button class="btn btn-outline-primary segment-btn" data-segment="0" onclick="songTable.playSegment('${tableId}', ${song.id}, 0)">
+                                                <div class="segment-label">Start</div>
+                                            </button>
+                                            <button class="btn btn-outline-primary segment-btn" data-segment="1" onclick="songTable.playSegment('${tableId}', ${song.id}, 1)">
+                                                <div class="segment-label">Pre-Mid</div>
+                                            </button>
+                                            <button class="btn btn-outline-primary segment-btn" data-segment="2" onclick="songTable.playSegment('${tableId}', ${song.id}, 2)">
+                                                <div class="segment-label">Middle</div>
+                                            </button>
+                                            <button class="btn btn-outline-primary segment-btn" data-segment="3" onclick="songTable.playSegment('${tableId}', ${song.id}, 3)">
+                                                <div class="segment-label">Post-Mid</div>
+                                            </button>
+                                            <button class="btn btn-outline-primary segment-btn" data-segment="4" onclick="songTable.playSegment('${tableId}', ${song.id}, 4)">
+                                                <div class="segment-label">End</div>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </td>
+        `;
+        
+        return previewRow;
+    }
+    
+    // Setup audio player
+    function setupAudioPlayer(tableId, songId) {
+        const previewAudio = document.getElementById(`previewPlayer-${tableId}-${songId}`);
+        if (!previewAudio) return;
+        
+        previewAudio.src = `/api/songs/${songId}/audio`;
+        previewAudio.load();
+        
+        previewAudio.addEventListener('loadedmetadata', () => {
+            const duration = previewAudio.duration;
+            
+            previewAudio.isAutoPlaying = true;
+            previewAudio.isShortSong = duration < 30;
+            
+            if (duration < 30) {
+                previewAudio.loop = true;
+            } else {
+                const previewControls = document.getElementById(`previewControls-${tableId}-${songId}`);
+                if (previewControls) {
+                    previewControls.style.display = 'block';
+                    
+                    // Auto-start preview
+                    playSegment(tableId, songId, 0);
+                }
+            }
+        });
+    }
+    
+    // Play segment
+    function playSegment(tableId, songId, segmentIndex) {
+        const previewAudio = document.getElementById(`previewPlayer-${tableId}-${songId}`);
+        if (!previewAudio) return;
+        
+        const duration = previewAudio.duration;
+        const segments = [
+            { start: 0, duration: 10 },
+            { start: duration * 0.25, duration: 10 },
+            { start: duration * 0.5, duration: 10 },
+            { start: duration * 0.75, duration: 10 },
+            { start: Math.max(0, duration - 10), duration: 10 }
+        ];
+        
+        const segment = segments[segmentIndex];
+        if (!segment) return;
+        
+        previewAudio.currentTime = segment.start;
+        previewAudio.play();
+        
+        // Stop after segment duration if auto-playing
+        if (previewAudio.isAutoPlaying) {
+            setTimeout(() => {
+                if (!previewAudio.paused) {
+                    previewAudio.pause();
+                    
+                    // Auto-advance to next segment
+                    const nextSegment = segmentIndex + 1;
+                    if (nextSegment < segments.length) {
+                        setTimeout(() => {
+                            playSegment(tableId, songId, nextSegment);
+                        }, 1000);
+                    } else {
+                        // Loop back to start
+                        setTimeout(() => {
+                            playSegment(tableId, songId, 0);
+                        }, 1000);
+                    }
+                }
+            }, segment.duration * 1000);
+        }
+        
+        // Update active segment button
+        const segmentButtons = document.querySelectorAll(`#segmentBar-${tableId}-${songId} .segment-btn`);
+        segmentButtons.forEach((btn, index) => {
+            btn.classList.toggle('active', index === segmentIndex);
+        });
+    }
+    
+    // Toggle auto play
+    function toggleAutoPlay(tableId, songId) {
+        const previewAudio = document.getElementById(`previewPlayer-${tableId}-${songId}`);
+        const toggleButton = document.getElementById(`autoPlayToggle-${tableId}-${songId}`);
+        
+        if (!previewAudio || !toggleButton) return;
+        
+        previewAudio.isAutoPlaying = !previewAudio.isAutoPlaying;
+        
+        if (previewAudio.isAutoPlaying) {
+            toggleButton.textContent = 'Stop Auto';
+            toggleButton.className = 'btn btn-sm btn-danger';
+        } else {
+            toggleButton.textContent = 'Start Auto';
+            toggleButton.className = 'btn btn-sm btn-success';
+        }
+    }
+    
+    // Stop all audio
+    function stopAllAudio(tableId) {
+        const audioElements = document.querySelectorAll(`#${tableId} audio`);
+        audioElements.forEach(audio => {
+            audio.pause();
+            audio.currentTime = 0;
+        });
+    }
+    
+    // Edit song (to be implemented by parent)
+    function editSong(tableId, songId) {
+        const instance = instances.get(tableId);
+        if (instance && instance.config.onEditSong) {
+            instance.config.onEditSong(songId);
+        }
+    }
+    
+    // Manage tags (to be implemented by parent)
+    function manageTags(tableId, songId) {
+        const instance = instances.get(tableId);
+        if (instance && instance.config.onManageTags) {
+            instance.config.onManageTags(songId);
+        }
+    }
+    
+    // Get selected songs
+    function getSelectedSongs(tableId) {
+        const instance = instances.get(tableId);
+        return instance ? Array.from(instance.selectedSongs) : [];
+    }
+    
+    // Clear selection
+    function clearSelection(tableId) {
+        const instance = instances.get(tableId);
+        if (instance) {
+            instance.selectedSongs.clear();
+            renderTable(tableId);
+            instance.onSelectionChange([]);
+        }
+    }
+    
+    // Helper functions
+    function getFolder(filePath) {
+        if (!filePath) return '';
+        const parts = filePath.split('/');
+        if (parts.length > 1) {
+            parts.pop();
+            return parts[parts.length - 1];
+        }
+        return '';
+    }
+    
+    function formatDuration(seconds) {
+        if (!seconds) return '';
+        const mins = Math.floor(seconds / 60);
+        const secs = Math.floor(seconds % 60);
+        return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    function formatDateTime(dateString) {
+        if (!dateString) return '';
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '';
+        return date.toLocaleDateString() + ' ' + date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+    }
+    
+    function getColumnCount(config) {
+        let count = 2; // Name and Album are always shown
+        if (config.showCheckboxes) count++;
+        if (config.showFolder) count++;
+        if (config.showAudioFeatures) count += 2; // Duration, Tempo, Audio Features
+        if (config.showCreatedAt) count++;
+        if (config.showTags) count++;
+        return count;
+    }
+    
+    // Public API
+    return {
+        init: init,
+        setSongs: setSongs,
+        filterSongs: filterSongs,
+        renderTable: renderTable,
+        toggleSongSelection: toggleSongSelection,
+        toggleSelectAll: toggleSelectAll,
+        sortTable: sortTable,
+        previewSong: previewSong,
+        closePreview: closePreview,
+        playSegment: playSegment,
+        toggleAutoPlay: toggleAutoPlay,
+        editSong: editSong,
+        manageTags: manageTags,
+        getSelectedSongs: getSelectedSongs,
+        clearSelection: clearSelection,
+        getInstance: (tableId) => instances.get(tableId)
+    };
+})();
+</script>
