@@ -1050,7 +1050,7 @@ function updateBatchActionsDisplay() {
 // Batch Tagging Functions
 function openBatchTagModal() {
     if (selectedSongs.size === 0) {
-        alert('Please select at least one song');
+        notify.warning('Please select at least one song');
         return;
     }
     
@@ -1097,12 +1097,12 @@ function toggleBatchTag(tagId) {
 
 async function applyBatchTags() {
     if (selectedSongs.size === 0) {
-        alert('No songs selected');
+        notify.warning('No songs selected');
         return;
     }
     
     if (batchSelectedTags.size === 0) {
-        alert('No tags selected');
+        notify.warning('No tags selected');
         return;
     }
     
@@ -1131,14 +1131,14 @@ async function applyBatchTags() {
             // Reload songs to reflect changes
             loadSongs();
             
-            alert(`Successfully ${operation === 'add' ? 'added' : operation === 'replace' ? 'replaced' : 'removed'} tags for ${result.updated_count} songs`);
+            notify.success(`Successfully ${operation === 'add' ? 'added' : operation === 'replace' ? 'replaced' : 'removed'} tags for ${result.updated_count} songs`);
         } else {
             const error = await response.json();
-            alert(`Error applying tags: ${error.detail}`);
+            notify.error(`Error applying tags: ${error.detail}`);
         }
     } catch (error) {
         console.error('Error applying batch tags:', error);
-        alert('Error applying batch tags');
+        notify.error('Error applying batch tags');
     }
 }
 
@@ -1177,21 +1177,21 @@ async function scanDirectory() {
                         message += `\n... and ${result.errors.length - 10} more errors`;
                     }
                 }
-                alert(message);
+                notificationSystem.info("Processing Complete", message);
             } else {
                 const error = await response.json();
-                alert(`Error processing directory: ${error.detail}`);
+                notificationSystem.error("Error", `Error processing directory: ${error.detail}`);
             }
         } catch (error) {
             console.error('Error processing directory:', error);
-            alert('Error processing directory');
+            notificationSystem.error("Error", 'Error processing directory');
         }
     } else {
         // Fallback to directory path method
         const directoryPath = document.getElementById('directoryPath').value.trim();
         
         if (!directoryPath) {
-            alert('Please select a directory or enter a directory path');
+            notify.warning('Please select a directory or enter a directory path');
             return;
         }
         
@@ -1222,14 +1222,14 @@ async function scanDirectory() {
                         message += `\n... and ${result.errors.length - 10} more errors`;
                     }
                 }
-                alert(message);
+                notificationSystem.info("Scanning Complete", message);
             } else {
                 const error = await response.json();
-                alert(`Error scanning directory: ${error.detail}`);
+                notificationSystem.error("Error", `Error scanning directory: ${error.detail}`);
             }
         } catch (error) {
             console.error('Error scanning directory:', error);
-            alert('Error scanning directory');
+            notificationSystem.error("Error", 'Error scanning directory');
         }
     }
 }
@@ -1284,12 +1284,12 @@ function selectDirectory() {
 
 function browseFile() {
     // Fallback for manual entry
-    alert('Please manually enter the file path. For better experience, use the Browse button to select files directly.');
+    notify.info('Please manually enter the file path. For better experience, use the Browse button to select files directly.');
 }
 
 function browseDirectory() {
     // Fallback for manual entry
-    alert('Please manually enter the directory path. For better experience, use the Browse button to select directories directly.');
+    notify.info('Please manually enter the directory path. For better experience, use the Browse button to select directories directly.');
 }
 
 function loadSamplePaths() {
@@ -1343,11 +1343,11 @@ async function updateSong() {
             modal.hide();
             loadSongs();
         } else {
-            alert('Error updating song');
+            notify.error('Error updating song');
         }
     } catch (error) {
         console.error('Error updating song:', error);
-        alert('Error updating song');
+        notify.error('Error updating song');
     }
 }
 
@@ -1988,12 +1988,12 @@ function playSegment(songId, segment) {
             }, 5000);
         }).catch(error => {
             console.error('Error playing audio:', error);
-            alert('Error playing audio preview. The file may not exist or be accessible.');
+            notify.error('Error playing audio preview. The file may not exist or be accessible.');
         });
         
     } catch (error) {
         console.error('Error in playSegment:', error);
-        alert('Error loading audio preview.');
+        notify.error('Error loading audio preview.');
     }
 }
 
@@ -2055,12 +2055,12 @@ async function deleteSong(songId) {
             } else {
                 // If deletion failed, restore the song
                 restoreSong();
-                alert('Error deleting song from server');
+                notify.error('Error deleting song from server');
             }
         } catch (error) {
             console.error('Error deleting song:', error);
             restoreSong();
-            alert('Error deleting song');
+            notify.error('Error deleting song');
         }
         
         // Clear undo data
@@ -2198,7 +2198,7 @@ async function loadSongTags(songId) {
         
     } catch (error) {
         console.error('Error loading song tags:', error);
-        alert('Error loading song tags: ' + error.message);
+        notificationSystem.error("Error", 'Error loading song tags: ' + error.message);
     }
 }
 
@@ -2216,11 +2216,11 @@ async function addTagToSong(songId, tagId) {
         } else {
             const errorText = await response.text();
             console.error('Error response:', errorText);
-            alert('Error adding tag to song: ' + errorText);
+            notificationSystem.error("Error", 'Error adding tag to song: ' + errorText);
         }
     } catch (error) {
         console.error('Error adding tag to song:', error);
-        alert('Error adding tag to song: ' + error.message);
+        notificationSystem.error("Error", 'Error adding tag to song: ' + error.message);
     }
 }
 
@@ -2238,11 +2238,11 @@ async function removeTagFromSong(songId, tagId) {
         } else {
             const errorText = await response.text();
             console.error('Error response:', errorText);
-            alert('Error removing tag from song: ' + errorText);
+            notificationSystem.error("Error", 'Error removing tag from song: ' + errorText);
         }
     } catch (error) {
         console.error('Error removing tag from song:', error);
-        alert('Error removing tag from song: ' + error.message);
+        notificationSystem.error("Error", 'Error removing tag from song: ' + error.message);
     }
 }
 
@@ -2257,7 +2257,7 @@ async function addSongToSelectedPlaylist() {
     const playlistId = document.getElementById('playlistSelectDropdown').value;
     
     if (!playlistId) {
-        alert('Please select a playlist');
+        notificationSystem.warning("Selection Required", 'Please select a playlist');
         return;
     }
     
@@ -2272,21 +2272,21 @@ async function addSongToSelectedPlaylist() {
             
             const song = songs.find(s => s.id == songId);
             const playlist = playlists.find(p => p.id == playlistId);
-            alert(`"${song.display_name}" added to playlist "${playlist.name}"`);
+            notificationSystem.success("Success", `"${song.display_name}" added to playlist "${playlist.name}"`);
         } else {
             const errorText = await response.text();
-            alert('Error adding song to playlist: ' + errorText);
+            notificationSystem.error("Error", 'Error adding song to playlist: ' + errorText);
         }
     } catch (error) {
         console.error('Error adding song to playlist:', error);
-        alert('Error adding song to playlist: ' + error.message);
+        notificationSystem.error("Error", 'Error adding song to playlist: ' + error.message);
     }
 }
 
 // Batch Operations Functions
 function openBatchPlaylistModal() {
     if (selectedSongs.size === 0) {
-        alert('No songs selected');
+        notificationSystem.warning("Selection Required", 'No songs selected');
         return;
     }
     
@@ -2296,13 +2296,13 @@ function openBatchPlaylistModal() {
 
 async function applyBatchPlaylist() {
     if (selectedSongs.size === 0) {
-        alert('No songs selected');
+        notificationSystem.warning("Selection Required", 'No songs selected');
         return;
     }
     
     const playlistId = document.getElementById('batchPlaylistSelect').value;
     if (!playlistId) {
-        alert('Please select a playlist');
+        notificationSystem.warning("Selection Required", 'Please select a playlist');
         return;
     }
     
@@ -2338,7 +2338,11 @@ async function applyBatchPlaylist() {
                 message += `\n... and ${errors.length - 5} more`;
             }
         }
-        alert(message);
+        if (errors.length > 0) {
+            notificationSystem.warning("Partial Success", message);
+        } else {
+            notificationSystem.success("Success", message);
+        }
         
         // Clear selection
         selectedSongs.clear();
@@ -2349,13 +2353,13 @@ async function applyBatchPlaylist() {
         
     } catch (error) {
         console.error('Error applying batch playlist:', error);
-        alert('Error applying batch playlist: ' + error.message);
+        notificationSystem.error("Error", 'Error applying batch playlist: ' + error.message);
     }
 }
 
 async function batchDeleteSongs() {
     if (selectedSongs.size === 0) {
-        alert('No songs selected');
+        notificationSystem.warning("Selection Required", 'No songs selected');
         return;
     }
     
@@ -2425,12 +2429,16 @@ async function performBatchDelete(songIds) {
         }
         
         if (successCount > 0 || errors.length > 0) {
-            alert(message);
+            if (errors.length > 0) {
+                notificationSystem.warning("Delete Complete with Errors", message);
+            } else {
+                notificationSystem.success("Delete Complete", message);
+            }
         }
         
     } catch (error) {
         console.error('Error performing batch delete:', error);
-        alert('Error deleting songs: ' + error.message);
+        notificationSystem.error("Error", 'Error deleting songs: ' + error.message);
         // Reload songs on error
         await loadSongs();
     }
@@ -2458,7 +2466,7 @@ function undoBatchDelete() {
     // Hide undo notification
     hideUndoNotification();
     
-    alert('Delete operation cancelled');
+    notificationSystem.info("Undone", 'Delete operation cancelled');
 }
 
 function showUndoNotification(message, undoCallback) {
@@ -2563,7 +2571,7 @@ async function scanLibrary() {
 // Rescan Functions
 function openRescanModal() {
     if (selectedSongs.size === 0) {
-        alert('No songs selected');
+        notificationSystem.warning("Selection Required", 'No songs selected');
         return;
     }
     
@@ -2576,7 +2584,7 @@ function openRescanModal() {
 
 async function applyRescan() {
     if (selectedSongs.size === 0) {
-        alert('No songs selected');
+        notificationSystem.warning("Selection Required", 'No songs selected');
         return;
     }
     

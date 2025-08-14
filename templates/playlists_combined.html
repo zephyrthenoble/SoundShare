@@ -8,15 +8,37 @@
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h1>Playlist Management</h1>
-                <p class="text-muted">Create, edit, and manage both static and dynamic playlists</p>
+                <p class="text-muted">Create, edit, and manage unified, static, and dynamic playlists</p>
             </div>
             <div>
+                <a href="/unified-playlists/create" class="btn btn-warning me-2">
+                    <i class="fas fa-layer-group"></i> New Unified Playlist
+                </a>
                 <a href="/playlists/create/static" class="btn btn-success me-2">
                     <i class="fas fa-plus"></i> New Static Playlist
                 </a>
                 <a href="/playlists/create/dynamic" class="btn btn-primary">
                     <i class="fas fa-magic"></i> New Dynamic Playlist
                 </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Unified Playlists Section (Full Width) -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="fas fa-layer-group me-2"></i>Unified Playlists
+                </h5>
+                <small class="text-muted">Advanced playlists combining manual songs with dynamic criteria</small>
+            </div>
+            <div class="card-body">
+                <div id="unifiedPlaylistsList">
+                    <!-- Unified playlists will be loaded here -->
+                </div>
             </div>
         </div>
     </div>
@@ -56,6 +78,7 @@
 </div>
 
 <script>
+let unifiedPlaylists = [];
 let staticPlaylists = [];
 let dynamicPlaylists = [];
 
@@ -120,9 +143,9 @@ function showUndoNotification(deletedData, remainingTime) {
 }
 
 function undoDelete() {
-    // For now, just show an alert explaining that undo is not implemented
+    // For now, just show a notification explaining that undo is not implemented
     // In a real application, you would restore the playlist from a backup/recycle bin
-    alert('Undo functionality would restore the playlist here.\nThis would require implementing a soft delete system in the backend.');
+    notificationSystem.info("Undo Not Implemented", 'Undo functionality would restore the playlist here.\nThis would require implementing a soft delete system in the backend.');
     dismissUndo();
 }
 
@@ -140,19 +163,75 @@ function dismissUndo() {
 
 async function loadPlaylists() {
     try {
+        const unifiedResponse = await fetch('/api/unified-playlists/');
+        unifiedPlaylists = await unifiedResponse.json();
+        
         const staticResponse = await fetch('/api/playlists/');
         staticPlaylists = await staticResponse.json();
         
         const dynamicResponse = await fetch('/api/dynamic-playlists/');
         dynamicPlaylists = await dynamicResponse.json();
         
+        renderUnifiedPlaylists();
         renderStaticPlaylists();
         renderDynamicPlaylists();
     } catch (error) {
         console.error('Error loading playlists:', error);
+        document.getElementById('unifiedPlaylistsList').innerHTML = '<div class="alert alert-danger">Error loading unified playlists</div>';
         document.getElementById('staticPlaylistsList').innerHTML = '<div class="alert alert-danger">Error loading static playlists</div>';
         document.getElementById('dynamicPlaylistsList').innerHTML = '<div class="alert alert-danger">Error loading dynamic playlists</div>';
     }
+}
+
+function renderUnifiedPlaylists() {
+    const container = document.getElementById('unifiedPlaylistsList');
+    
+    if (unifiedPlaylists.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-5">
+                <i class="fas fa-layer-group fa-3x text-muted mb-3"></i>
+                <h5 class="text-muted">No unified playlists yet</h5>
+                <p class="text-muted">Create your first unified playlist to combine manual songs with dynamic criteria</p>
+                <a href="/unified-playlists/create" class="btn btn-warning">
+                    <i class="fas fa-plus"></i> Create Unified Playlist
+                </a>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = unifiedPlaylists.map(playlist => `
+        <div class="card mb-3 playlist-card" onclick="window.location.href='/unified-playlists/${playlist.id}'" style="cursor: pointer;">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <h5 class="card-title mb-2">
+                            <i class="fas fa-layer-group me-2 text-warning"></i>${playlist.name}
+                        </h5>
+                        <p class="card-text text-muted small mb-2">${playlist.description || 'No description'}</p>
+                        <div class="d-flex gap-2 mb-2">
+                            <span class="badge bg-primary">${playlist.manual_songs?.length || 0} manual songs</span>
+                            <span class="badge bg-info">${playlist.dynamic_criteria?.length || 0} dynamic criteria</span>
+                        </div>
+                        <small class="text-muted">
+                            <i class="fas fa-clock me-1"></i>
+                            Updated ${new Date(playlist.updated_at).toLocaleDateString()}
+                        </small>
+                    </div>
+                    <div class="dropdown" onclick="event.stopPropagation();">
+                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                            <i class="fas fa-ellipsis-v"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="/unified-playlists/edit/${playlist.id}"><i class="fas fa-edit me-2"></i>Edit</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item text-danger" href="#" onclick="deleteUnifiedPlaylist(${playlist.id}, '${playlist.name}')"><i class="fas fa-trash me-2"></i>Delete</a></li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `).join('');
 }
 
 function renderStaticPlaylists() {
@@ -259,13 +338,31 @@ async function deletePlaylist(type, playlistId, playlistName) {
         
         if (response.ok) {
             await loadPlaylists();
-            alert(`Playlist "${playlistName}" deleted successfully.`);
+            notificationSystem.success("Success", `Playlist "${playlistName}" deleted successfully.`);
         } else {
             throw new Error('Failed to delete playlist');
         }
     } catch (error) {
         console.error('Error deleting playlist:', error);
-        alert('Error deleting playlist. Please try again.');
+        notificationSystem.error("Error", 'Error deleting playlist. Please try again.');
+    }
+}
+
+async function deleteUnifiedPlaylist(playlistId, playlistName) {
+    if (!confirm(`Are you sure you want to delete the unified playlist "${playlistName}"? This action cannot be undone.`)) return;
+    
+    try {
+        const response = await fetch(`/api/unified-playlists/${playlistId}`, { method: 'DELETE' });
+        
+        if (response.ok) {
+            await loadPlaylists();
+            notificationSystem.success("Success", `Unified playlist "${playlistName}" deleted successfully.`);
+        } else {
+            throw new Error('Failed to delete unified playlist');
+        }
+    } catch (error) {
+        console.error('Error deleting unified playlist:', error);
+        notificationSystem.error("Error", 'Error deleting unified playlist. Please try again.');
     }
 }
 

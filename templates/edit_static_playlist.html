@@ -263,7 +263,7 @@ document.addEventListener('DOMContentLoaded', function() {
     playlistId = urlParts[urlParts.length - 1]; // Extract ID from URL like /playlists/edit/123
     
     if (!playlistId || isNaN(parseInt(playlistId))) {
-        alert('No valid playlist ID provided');
+        notificationSystem.error("Error", 'No valid playlist ID provided');
         window.location.href = '/playlists';
         return;
     }
@@ -312,7 +312,7 @@ async function loadAllData() {
         
     } catch (error) {
         console.error('Error loading data:', error);
-        alert('Error loading playlist. Returning to playlists page.');
+        notificationSystem.error("Error", 'Error loading playlist. Returning to playlists page.');
         window.location.href = '/playlists';
     }
 }
@@ -691,7 +691,7 @@ async function addSongToPlaylist(songId) {
         
     } catch (error) {
         console.error('Error adding song:', error);
-        alert('Error adding song to playlist');
+        notificationSystem.error("Error", 'Error adding song to playlist');
     }
 }
 
@@ -714,7 +714,7 @@ async function removeSongFromPlaylist(songId) {
         
     } catch (error) {
         console.error('Error removing song:', error);
-        alert('Error removing song from playlist');
+        notificationSystem.error("Error", 'Error removing song from playlist');
     }
 }
 
@@ -753,7 +753,7 @@ async function addSongsInBatches(songIds) {
             
         } catch (error) {
             console.error('Error adding batch:', error);
-            alert(`Error adding some songs. ${i * batchSize} songs were added successfully.`);
+            notificationSystem.error("Error", `Error adding some songs. ${i * batchSize} songs were added successfully.`);
             break;
         }
     }
@@ -788,7 +788,7 @@ async function removeSongsInBatches(songIds) {
             
         } catch (error) {
             console.error('Error removing batch:', error);
-            alert(`Error removing some songs.`);
+            notificationSystem.error("Error", `Error removing some songs.`);
             break;
         }
     }
@@ -808,7 +808,7 @@ async function savePlaylist() {
     const description = document.getElementById('playlistDescription').value.trim();
     
     if (!name) {
-        alert('Please enter a playlist name');
+        notificationSystem.warning("Validation Error", 'Please enter a playlist name');
         document.getElementById('playlistName').focus();
         return;
     }
@@ -847,7 +847,7 @@ async function savePlaylist() {
         
     } catch (error) {
         console.error('Error updating playlist:', error);
-        alert('Error updating playlist. Please try again.');
+        notificationSystem.error("Error", 'Error updating playlist. Please try again.');
     }
 }
 
@@ -884,7 +884,7 @@ async function deletePlaylist() {
         
     } catch (error) {
         console.error('Error deleting playlist:', error);
-        alert('Error deleting playlist. Please try again.');
+        notificationSystem.error("Error", 'Error deleting playlist. Please try again.');
     }
 }
 

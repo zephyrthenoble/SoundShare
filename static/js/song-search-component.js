@@ -614,7 +614,7 @@ class SongSearchComponent {
         }
 
         // Format duration
-        const duration = song.duration ? this.formatDuration(song.duration) : '--';
+        const duration = song.duration ? SoundShareUtils.formatDuration(song.duration) : '--';
         
         // Format mood indicators
         const moodHTML = this.getMoodIndicators(song);
@@ -647,12 +647,6 @@ class SongSearchComponent {
         `;
 
         return row;
-    }
-
-    formatDuration(seconds) {
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = Math.floor(seconds % 60);
-        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     }
 
     getMoodIndicators(song) {

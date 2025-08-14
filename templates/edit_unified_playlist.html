@@ -1,0 +1,596 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Unified Playlist - SoundShare{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 id="pageTitle">Create Unified Playlist</h1>
+                <p class="text-muted">Combine manual songs with dynamic criteria for advanced playlist management</p>
+            </div>
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-success" onclick="savePlaylist()" id="saveBtn">
+                    <i class="fas fa-save"></i> <span id="saveBtnText">Create Playlist</span>
+                </button>
+                <button type="button" class="btn btn-outline-secondary" onclick="goBackToPlaylists()">
+                    <i class="fas fa-arrow-left"></i> Back to Playlists
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Playlist Details -->
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Playlist Details</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="playlistName" class="form-label">Playlist Name *</label>
+                            <input type="text" class="form-control" id="playlistName" required>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="playlistDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="playlistDescription" rows="2" placeholder="Describe your playlist..."></textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Main Content: Manual Songs and Dynamic Criteria -->
+<div class="row">
+    <!-- Manual Songs Section -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-music me-2"></i>Manual Songs
+                    <span class="badge bg-primary ms-2" id="manualSongCount">0</span>
+                </h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="openSongSelector()">
+                    <i class="fas fa-plus"></i> Add Songs
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="manualSongsList" class="mb-3">
+                    <!-- Manual songs will be listed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dynamic Criteria Section -->
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-filter me-2"></i>Dynamic Criteria
+                    <span class="badge bg-info ms-2" id="criteriaCount">0</span>
+                </h5>
+                <button class="btn btn-sm btn-outline-info" onclick="addDynamicCriteria()">
+                    <i class="fas fa-plus"></i> Add Criteria
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="dynamicCriteriaList">
+                    <!-- Dynamic criteria will be listed here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Song Selection Modal -->
+<div class="modal fade" id="songSelectorModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Add Songs to Playlist</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <!-- Search and Filter Controls -->
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <input type="text" class="form-control" id="songSearchInput" placeholder="Search songs...">
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="artistFilter">
+                            <option value="">All Artists</option>
+                        </select>
+                    </div>
+                    <div class="col-md-3">
+                        <select class="form-select" id="albumFilter">
+                            <option value="">All Albums</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- Songs List -->
+                <div style="max-height: 400px; overflow-y: auto;">
+                    <div id="availableSongsList">
+                        <!-- Available songs will be loaded here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <span id="selectedSongsCount" class="me-auto text-muted">0 songs selected</span>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" onclick="addSelectedSongs()">
+                    <i class="fas fa-plus"></i> Add Selected Songs
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Dynamic Criteria Modal -->
+<div class="modal fade" id="criteriaModal" tabindex="-1">
+    <div class="modal-dialog modal-xl">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="criteriaModalTitle">Add Dynamic Criteria</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="row">
+                    <div class="col-md-12 mb-3">
+                        <label for="criteriaName" class="form-label">Criteria Name *</label>
+                        <input type="text" class="form-control" id="criteriaName" placeholder="e.g., High Energy Rock Songs" required>
+                    </div>
+                </div>
+                
+                <!-- Include Criteria -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0 text-success">
+                            <i class="fas fa-plus-circle me-2"></i>Include Criteria
+                            <small class="text-muted">(Songs must match ALL of these conditions)</small>
+                        </h6>
+                    </div>
+                    <div class="card-body" id="includeCriteriaSection">
+                        <!-- Include criteria controls will be added here -->
+                    </div>
+                </div>
+                
+                <!-- Exclude Criteria -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0 text-danger">
+                            <i class="fas fa-minus-circle me-2"></i>Exclude Criteria
+                            <small class="text-muted">(Songs must NOT match any of these conditions)</small>
+                        </h6>
+                    </div>
+                    <div class="card-body" id="excludeCriteriaSection">
+                        <!-- Exclude criteria controls will be added here -->
+                    </div>
+                </div>
+                
+                <!-- Preview -->
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="fas fa-eye me-2"></i>Preview
+                            <span class="badge bg-info ms-2" id="previewCount">0 songs</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <button type="button" class="btn btn-outline-primary btn-sm" onclick="previewCriteria()">
+                            <i class="fas fa-search"></i> Preview Matching Songs
+                        </button>
+                        <div id="criteriaPreview" class="mt-3" style="display: none;">
+                            <!-- Preview results will be shown here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveCriteria()">
+                    <i class="fas fa-save"></i> <span id="saveCriteriaText">Add Criteria</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Global variables
+let playlistId = null;
+let playlist = null;
+let manualSongs = [];
+let dynamicCriteria = [];
+let availableSongs = [];
+let selectedSongs = new Set();
+let editingCriteriaId = null;
+
+// Initialize page
+document.addEventListener('DOMContentLoaded', function() {
+    // Get playlist ID from URL (if editing)
+    const path = window.location.pathname;
+    const pathParts = path.split('/');
+    if (pathParts.length > 3 && pathParts[3] !== 'edit') {
+        playlistId = parseInt(pathParts[3]);
+    }
+    
+    if (playlistId) {
+        // Editing mode
+        document.getElementById('pageTitle').textContent = 'Edit Unified Playlist';
+        document.getElementById('saveBtnText').textContent = 'Save Changes';
+        loadPlaylistForEditing();
+    } else {
+        // Creation mode
+        initializeForCreation();
+    }
+    
+    // Load available songs for song selector
+    loadAvailableSongs();
+});
+
+async function loadPlaylistForEditing() {
+    try {
+        const response = await fetch(`/api/unified-playlists/${playlistId}`);
+        if (!response.ok) throw new Error('Playlist not found');
+        
+        playlist = await response.json();
+        
+        // Populate form
+        document.getElementById('playlistName').value = playlist.name;
+        document.getElementById('playlistDescription').value = playlist.description || '';
+        
+        // Load manual songs and criteria
+        manualSongs = playlist.manual_songs || [];
+        dynamicCriteria = playlist.dynamic_criteria || [];
+        
+        renderManualSongs();
+        renderDynamicCriteria();
+        updateCounts();
+        
+    } catch (error) {
+        console.error('Error loading playlist:', error);
+        notificationSystem.error("Error", 'Failed to load playlist for editing.');
+        goBackToPlaylists();
+    }
+}
+
+function initializeForCreation() {
+    manualSongs = [];
+    dynamicCriteria = [];
+    renderManualSongs();
+    renderDynamicCriteria();
+    updateCounts();
+}
+
+async function loadAvailableSongs() {
+    try {
+        const response = await fetch('/api/songs');
+        if (!response.ok) throw new Error('Failed to load songs');
+        availableSongs = await response.json();
+    } catch (error) {
+        console.error('Error loading songs:', error);
+        notificationSystem.error("Error", 'Failed to load available songs.');
+    }
+}
+
+function renderManualSongs() {
+    const container = document.getElementById('manualSongsList');
+    
+    if (manualSongs.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-4 text-muted">
+                <i class="fas fa-music fa-2x mb-2"></i>
+                <p>No manual songs added yet</p>
+                <button class="btn btn-outline-primary btn-sm" onclick="openSongSelector()">
+                    <i class="fas fa-plus"></i> Add Songs
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = manualSongs.map(song => `
+        <div class="d-flex align-items-center justify-content-between p-2 border rounded mb-2">
+            <div class="flex-grow-1">
+                <div class="fw-bold">${song.display_name}</div>
+                <div class="text-muted small">${song.artist || 'Unknown Artist'}</div>
+            </div>
+            <button class="btn btn-sm btn-outline-danger" onclick="removeManualSong(${song.id})" title="Remove">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function renderDynamicCriteria() {
+    const container = document.getElementById('dynamicCriteriaList');
+    
+    if (dynamicCriteria.length === 0) {
+        container.innerHTML = `
+            <div class="text-center py-4 text-muted">
+                <i class="fas fa-filter fa-2x mb-2"></i>
+                <p>No dynamic criteria added yet</p>
+                <button class="btn btn-outline-info btn-sm" onclick="addDynamicCriteria()">
+                    <i class="fas fa-plus"></i> Add Criteria
+                </button>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = dynamicCriteria.map(criteria => `
+        <div class="border rounded p-3 mb-3">
+            <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1">
+                    <h6 class="mb-2">${criteria.name}</h6>
+                    <div class="small text-muted mb-2">
+                        ${renderCriteriaSummary(criteria)}
+                    </div>
+                </div>
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-outline-primary" onclick="editCriteria(${criteria.id || criteria.tempId})" title="Edit">
+                        <i class="fas fa-edit"></i>
+                    </button>
+                    <button class="btn btn-sm btn-outline-danger" onclick="removeCriteria(${criteria.id || criteria.tempId})" title="Remove">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+function renderCriteriaSummary(criteria) {
+    const parts = [];
+    
+    // Include criteria
+    if (criteria.include_criteria) {
+        Object.entries(criteria.include_criteria).forEach(([field, values]) => {
+            if (Array.isArray(values) && values.length > 0) {
+                parts.push(`<span class="badge bg-success me-1">+${field}: ${values.length} items</span>`);
+            } else if (values && typeof values === 'object' && (values.min !== undefined || values.max !== undefined)) {
+                parts.push(`<span class="badge bg-success me-1">+${field}: range</span>`);
+            }
+        });
+    }
+    
+    // Exclude criteria  
+    if (criteria.exclude_criteria) {
+        Object.entries(criteria.exclude_criteria).forEach(([field, values]) => {
+            if (Array.isArray(values) && values.length > 0) {
+                parts.push(`<span class="badge bg-danger me-1">-${field}: ${values.length} items</span>`);
+            } else if (values && typeof values === 'object' && (values.min !== undefined || values.max !== undefined)) {
+                parts.push(`<span class="badge bg-danger me-1">-${field}: range</span>`);
+            }
+        });
+    }
+    
+    return parts.length > 0 ? parts.join('') : '<span class="text-muted">No criteria defined</span>';
+}
+
+function updateCounts() {
+    document.getElementById('manualSongCount').textContent = manualSongs.length;
+    document.getElementById('criteriaCount').textContent = dynamicCriteria.length;
+}
+
+// Song selector functions
+function openSongSelector() {
+    const modal = new bootstrap.Modal(document.getElementById('songSelectorModal'));
+    populateSongSelector();
+    modal.show();
+}
+
+function populateSongSelector() {
+    const container = document.getElementById('availableSongsList');
+    const manualSongIds = new Set(manualSongs.map(s => s.id));
+    
+    const filteredSongs = availableSongs.filter(song => !manualSongIds.has(song.id));
+    
+    container.innerHTML = filteredSongs.map(song => `
+        <div class="form-check p-2 border-bottom">
+            <input class="form-check-input" type="checkbox" value="${song.id}" id="song-${song.id}" onchange="updateSelectedSongsCount()">
+            <label class="form-check-label d-flex justify-content-between w-100" for="song-${song.id}">
+                <div>
+                    <div class="fw-bold">${song.display_name}</div>
+                    <div class="text-muted small">${song.artist || 'Unknown Artist'} • ${song.album || 'Unknown Album'}</div>
+                </div>
+                <div class="text-muted small">
+                    ${song.duration ? Math.floor(song.duration / 60) + ':' + (song.duration % 60).toString().padStart(2, '0') : ''}
+                </div>
+            </label>
+        </div>
+    `).join('');
+}
+
+function updateSelectedSongsCount() {
+    const checkboxes = document.querySelectorAll('#availableSongsList input[type="checkbox"]:checked');
+    document.getElementById('selectedSongsCount').textContent = `${checkboxes.length} songs selected`;
+}
+
+function addSelectedSongs() {
+    const checkboxes = document.querySelectorAll('#availableSongsList input[type="checkbox"]:checked');
+    const newSongIds = Array.from(checkboxes).map(cb => parseInt(cb.value));
+    
+    const newSongs = availableSongs.filter(song => newSongIds.includes(song.id));
+    manualSongs.push(...newSongs);
+    
+    renderManualSongs();
+    updateCounts();
+    
+    // Close modal
+    bootstrap.Modal.getInstance(document.getElementById('songSelectorModal')).hide();
+    
+    notificationSystem.success("Success", `Added ${newSongs.length} songs to playlist`);
+}
+
+function removeManualSong(songId) {
+    manualSongs = manualSongs.filter(song => song.id !== songId);
+    renderManualSongs();
+    updateCounts();
+}
+
+// Dynamic criteria functions
+function addDynamicCriteria() {
+    editingCriteriaId = null;
+    document.getElementById('criteriaModalTitle').textContent = 'Add Dynamic Criteria';
+    document.getElementById('saveCriteriaText').textContent = 'Add Criteria';
+    document.getElementById('criteriaName').value = '';
+    
+    // Clear criteria sections
+    document.getElementById('includeCriteriaSection').innerHTML = '';
+    document.getElementById('excludeCriteriaSection').innerHTML = '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('criteriaModal'));
+    modal.show();
+}
+
+function editCriteria(criteriaId) {
+    // TODO: Implement criteria editing
+    notificationSystem.info("Coming Soon", "Criteria editing will be implemented next");
+}
+
+function removeCriteria(criteriaId) {
+    if (criteriaId.toString().startsWith('temp_')) {
+        // Remove temporary criteria
+        dynamicCriteria = dynamicCriteria.filter(c => c.tempId !== criteriaId);
+    } else {
+        // Remove saved criteria
+        dynamicCriteria = dynamicCriteria.filter(c => c.id !== criteriaId);
+    }
+    renderDynamicCriteria();
+    updateCounts();
+}
+
+function saveCriteria() {
+    const name = document.getElementById('criteriaName').value.trim();
+    if (!name) {
+        notificationSystem.warning("Validation Error", "Please enter a criteria name");
+        return;
+    }
+    
+    // Create new criteria (simplified for now)
+    const newCriteria = {
+        tempId: 'temp_' + Date.now(),
+        name: name,
+        include_criteria: {},
+        exclude_criteria: {},
+        order_index: dynamicCriteria.length
+    };
+    
+    dynamicCriteria.push(newCriteria);
+    renderDynamicCriteria();
+    updateCounts();
+    
+    // Close modal
+    bootstrap.Modal.getInstance(document.getElementById('criteriaModal')).hide();
+    
+    notificationSystem.success("Success", `Added criteria "${name}"`);
+}
+
+function previewCriteria() {
+    notificationSystem.info("Coming Soon", "Criteria preview will be implemented next");
+}
+
+// Save playlist
+async function savePlaylist() {
+    const name = document.getElementById('playlistName').value.trim();
+    if (!name) {
+        notificationSystem.warning("Validation Error", "Please enter a playlist name");
+        return;
+    }
+    
+    const playlistData = {
+        name: name,
+        description: document.getElementById('playlistDescription').value.trim()
+    };
+    
+    try {
+        let response;
+        if (playlistId) {
+            // Update existing playlist
+            response = await fetch(`/api/unified-playlists/${playlistId}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(playlistData)
+            });
+        } else {
+            // Create new playlist
+            response = await fetch('/api/unified-playlists/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(playlistData)
+            });
+        }
+        
+        if (!response.ok) throw new Error('Failed to save playlist');
+        
+        const savedPlaylist = await response.json();
+        
+        if (!playlistId) {
+            playlistId = savedPlaylist.id;
+        }
+        
+        // TODO: Save manual songs and dynamic criteria
+        // For now, just show success message
+        
+        const action = playlist ? 'updated' : 'created';
+        notificationSystem.success("Success", `Playlist "${name}" ${action} successfully!`);
+        
+        // Redirect to playlist view
+        window.location.href = `/unified-playlists/${playlistId}`;
+        
+    } catch (error) {
+        console.error('Error saving playlist:', error);
+        notificationSystem.error("Error", 'Failed to save playlist. Please try again.');
+    }
+}
+
+function goBackToPlaylists() {
+    window.location.href = '/playlists';
+}
+</script>
+
+<style>
+.playlist-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transition: all 0.2s ease;
+}
+
+#availableSongsList {
+    max-height: 400px;
+}
+
+.form-check-label {
+    cursor: pointer;
+}
+
+.criteria-section {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    padding: 1rem;
+    margin-bottom: 1rem;
+}
+
+.criteria-section.include {
+    border-color: #198754;
+    background-color: #f8fffe;
+}
+
+.criteria-section.exclude {
+    border-color: #dc3545;
+    background-color: #fef8f8;
+}
+</style>
+{% endblock %}

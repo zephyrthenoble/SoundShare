@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, Table, Text, DateTime
+from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey, Table, Text, DateTime, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -150,3 +150,73 @@ class DynamicPlaylist(Base):
     exclude_tags = relationship("Tag", secondary=dynamic_playlist_exclude_tags)
     include_groups = relationship("TagGroup", secondary=dynamic_playlist_include_groups)
     exclude_groups = relationship("TagGroup", secondary=dynamic_playlist_exclude_groups)
+
+
+# New Unified Playlist System
+
+# Association tables for UnifiedPlaylist
+unified_playlist_manual_songs = Table(
+    'unified_playlist_manual_songs',
+    Base.metadata,
+    Column('unified_playlist_id', Integer, ForeignKey('unified_playlists.id'), primary_key=True),
+    Column('song_id', Integer, ForeignKey('songs.id'), primary_key=True),
+    Column('order_index', Integer, default=0)
+)
+
+class UnifiedPlaylist(Base):
+    __tablename__ = "unified_playlists"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    description = Column(Text)
+    
+    # Song ordering - JSON array of song IDs in display order
+    # This allows for custom ordering of manual + dynamic songs
+    song_order = Column(JSON, default=list)  # List of song IDs in order
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    manual_songs = relationship("Song", secondary=unified_playlist_manual_songs)
+    dynamic_criteria = relationship("DynamicCriteria", back_populates="playlist", cascade="all, delete-orphan")
+
+class DynamicCriteria(Base):
+    __tablename__ = "dynamic_criteria"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    playlist_id = Column(Integer, ForeignKey('unified_playlists.id'), nullable=False)
+    name = Column(String, nullable=False)  # User-friendly name for this criteria
+    
+    # Flexible inclusion/exclusion criteria stored as JSON
+    # Structure: {
+    #   "include": {
+    #     "tags": [tag_ids],
+    #     "tag_groups": [group_ids],
+    #     "artists": [artist_names],
+    #     "albums": [album_names],
+    #     "genres": [genre_names],
+    #     "folders": [folder_names],
+    #     "paths": [path_patterns],
+    #     "energy": {"min": 0.0, "max": 1.0},
+    #     "valence": {"min": 0.0, "max": 1.0},
+    #     "danceability": {"min": 0.0, "max": 1.0},
+    #     "tempo": {"min": 60, "max": 200},
+    #     "duration": {"min": 30, "max": 600},
+    #     "year": {"min": 1990, "max": 2024}
+    #   },
+    #   "exclude": {
+    #     // Same structure as include
+    #   }
+    # }
+    include_criteria = Column(JSON, default=dict)
+    exclude_criteria = Column(JSON, default=dict)
+    
+    # Order within the playlist (multiple criteria can be ordered)
+    order_index = Column(Integer, default=0)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationship back to playlist
+    playlist = relationship("UnifiedPlaylist", back_populates="dynamic_criteria")

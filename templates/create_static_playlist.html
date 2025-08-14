@@ -175,7 +175,7 @@ async function loadAllData() {
         
     } catch (error) {
         console.error('Error loading data:', error);
-        alert('Error loading data. Please refresh the page.');
+        notificationSystem.error("Error", 'Error loading data. Please refresh the page.');
     }
 }
 
@@ -494,13 +494,13 @@ async function savePlaylist() {
     const description = document.getElementById('playlistDescription').value.trim();
     
     if (!name) {
-        alert('Please enter a playlist name');
+        notificationSystem.warning("Validation Error", 'Please enter a playlist name');
         document.getElementById('playlistName').focus();
         return;
     }
     
     if (selectedSongs.length === 0) {
-        alert('Please select at least one song');
+        notificationSystem.warning("Validation Error", 'Please select at least one song');
         return;
     }
     
@@ -526,12 +526,12 @@ async function savePlaylist() {
             });
         }
         
-        alert(`Playlist "${name}" created successfully with ${selectedSongs.length} songs!`);
+        notificationSystem.success("Success", `Playlist "${name}" created successfully with ${selectedSongs.length} songs!`);
         window.location.href = '/playlists';
         
     } catch (error) {
         console.error('Error creating playlist:', error);
-        alert('Error creating playlist. Please try again.');
+        notificationSystem.error("Error", 'Error creating playlist. Please try again.');
     }
 }
 </script>

@@ -453,18 +453,11 @@ class SongManager {
             <td>${this.escapeHtml(song.folder_name || "")}</td>
             <td>${this.escapeHtml(song.album || "")}</td>
             <td>${song.track_number || ""}</td>
-            <td>${this.formatDuration(song.duration)}</td>
+            <td>${SoundShareUtils.formatDuration(song.duration)}</td>
             <td>${this.formatMoodInfo(song)}</td>
         `;
 
         return row;
-    }
-
-    formatDuration(seconds) {
-        if (!seconds) return "";
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, "0")}`;
     }
 
     formatMoodInfo(song) {

@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 import uvicorn
 
 from database.database import engine, Base
-from routes import songs, playlists, tags, groups, dynamic_playlists, library
+from routes import songs, playlists, tags, groups, dynamic_playlists, library, unified_playlists
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -21,6 +21,7 @@ templates = Jinja2Templates(directory="templates")
 # Include routers
 app.include_router(songs.router, prefix="/api/songs", tags=["songs"])
 app.include_router(playlists.router, prefix="/api/playlists", tags=["playlists"])
+app.include_router(unified_playlists.router, prefix="/api/unified-playlists", tags=["unified-playlists"])
 app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
 app.include_router(groups.router, prefix="/api/groups", tags=["groups"])
 app.include_router(dynamic_playlists.router, prefix="/api/dynamic-playlists", tags=["dynamic-playlists"])
@@ -37,6 +38,18 @@ async def playlists_page(request: Request):
 @app.get("/playlists/{playlist_id}")
 async def playlist_info_page(request: Request, playlist_id: int):
     return templates.TemplateResponse("playlist_info.html", {"request": request})
+
+@app.get("/unified-playlists/create", response_class=HTMLResponse)
+async def create_unified_playlist_page(request: Request):
+    return templates.TemplateResponse("edit_unified_playlist.html", {"request": request})
+
+@app.get("/unified-playlists/edit/{playlist_id}", response_class=HTMLResponse)
+async def edit_unified_playlist_page(request: Request, playlist_id: int):
+    return templates.TemplateResponse("edit_unified_playlist.html", {"request": request})
+
+@app.get("/unified-playlists/{playlist_id}")
+async def unified_playlist_info_page(request: Request, playlist_id: int):
+    return templates.TemplateResponse("unified_playlist_info.html", {"request": request})
 
 @app.get("/playlists/dynamic/{playlist_id}")
 async def dynamic_playlist_info_page(request: Request, playlist_id: int):

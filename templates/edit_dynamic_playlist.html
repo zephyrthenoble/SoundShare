@@ -289,7 +289,7 @@ document.addEventListener('DOMContentLoaded', function() {
     playlistId = urlParts[urlParts.length - 1]; // Extract ID from URL like /playlists/edit/dynamic/123
     
     if (!playlistId || isNaN(parseInt(playlistId))) {
-        alert('No valid playlist ID provided');
+        notify.error('No valid playlist ID provided');
         window.location.href = '/playlists';
         return;
     }
@@ -363,7 +363,7 @@ async function loadAllData() {
         
     } catch (error) {
         console.error('Error loading data:', error);
-        alert('Error loading playlist. Returning to playlists page.');
+        notify.error('Error loading playlist. Returning to playlists page.');
         window.location.href = '/playlists';
     }
 }
@@ -846,7 +846,7 @@ async function savePlaylist() {
     const description = document.getElementById('playlistDescription').value.trim();
     
     if (!name) {
-        alert('Please enter a playlist name');
+        notify.warning('Please enter a playlist name');
         document.getElementById('playlistName').focus();
         return;
     }
@@ -862,7 +862,7 @@ async function savePlaylist() {
     const hasAudioFeatureCriteria = energyFilter || valenceFilter || danceabilityFilter;
     
     if (!hasTagCriteria && !hasGroupCriteria && !hasAudioFeatureCriteria) {
-        alert('Please specify at least one criteria:\n• Add include/exclude tags or groups, OR\n• Select audio feature filters (Energy, Mood, or Dance)');
+        notify.warning('Please specify at least one criteria: Add include/exclude tags or groups, OR select audio feature filters (Energy, Mood, or Dance)');
         return;
     }
     
@@ -1002,7 +1002,7 @@ async function savePlaylist() {
         
     } catch (error) {
         console.error('Error updating dynamic playlist:', error);
-        alert('Error updating dynamic playlist. Please try again.');
+        notify.error('Error updating dynamic playlist. Please try again.');
     }
 }
 
@@ -1039,13 +1039,13 @@ async function deletePlaylist() {
         
     } catch (error) {
         console.error('Error deleting playlist:', error);
-        alert('Error deleting playlist. Please try again.');
+        notify.error('Error deleting playlist. Please try again.');
     }
 }
 
 async function rescanPlaylist() {
     if (!playlistId) {
-        alert('Please save the playlist first before rescanning.');
+        notify.warning('Please save the playlist first before rescanning.');
         return;
     }
     
@@ -1069,7 +1069,7 @@ async function rescanPlaylist() {
         
         // Show success message
         const playlistName = document.getElementById('playlistName').value || 'Playlist';
-        alert(`Rescan completed for "${playlistName}"!\n\nFound: ${result.song_count} songs\nFiles checked: ${result.files_checked}\nMissing files: ${result.missing_files}`);
+        notify.success(`Rescan completed for "${playlistName}"! Found: ${result.song_count} songs, Files checked: ${result.files_checked}, Missing files: ${result.missing_files}`);
         
         // Refresh the preview if it's currently showing
         if (document.getElementById('songsContainer').children.length > 0) {
@@ -1078,7 +1078,7 @@ async function rescanPlaylist() {
         
     } catch (error) {
         console.error('Error rescanning playlist:', error);
-        alert('Error rescanning playlist. Please try again.');
+        notify.error('Error rescanning playlist. Please try again.');
     } finally {
         // Restore button state
         button.innerHTML = originalHtml;
@@ -1295,7 +1295,7 @@ function addSongToPlaylist(songId) {
     const song = allSongs.find(s => s.id === songId);
     if (!song) return;
     
-    alert(`Note: This is a dynamic playlist. Songs are automatically included based on your tag and filter criteria.\n\n"${song.display_name}" will be included if it matches your current settings.`);
+    notify.info(`Note: This is a dynamic playlist. Songs are automatically included based on your tag and filter criteria. "${song.display_name}" will be included if it matches your current settings.`);
 }
 </script>
 

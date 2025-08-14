@@ -135,6 +135,27 @@
     </div>
 </div>
 
+<!-- Dynamic Criteria Section -->
+<div class="row mb-4" id="dynamicCriteriaSection" style="display: none;">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="fas fa-filter me-2"></i>Dynamic Criteria
+                </h5>
+                <button class="btn btn-sm btn-outline-primary" onclick="addDynamicCriteria()">
+                    <i class="fas fa-plus"></i> Add Criteria
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="dynamicCriteriaList">
+                    <!-- Dynamic criteria will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Song Lists -->
 <div class="row">
     <!-- Current Playlist -->
@@ -255,13 +276,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
 async function loadPlaylistData() {
     try {
-        const response = await fetch(`/api/playlists/${playlistId}`);
+        // Load unified playlist data with songs
+        const response = await fetch(`/api/unified-playlists/${playlistId}/songs`);
         if (!response.ok) {
             throw new Error('Playlist not found');
         }
         
-        playlist = await response.json();
-        songs = playlist.songs || [];
+        const data = await response.json();
+        playlist = data.playlist;
+        songs = data.songs || [];
         
         // Update shared player data
         window.playlistPlayer.playlist = playlist;
@@ -272,8 +295,14 @@ async function loadPlaylistData() {
         renderPlaylistSongs();
         window.playlistPlayer.updateStatistics();
         
+        // Update statistics display
+        updatePlaylistStatistics(data);
+        
+        // Render dynamic criteria
+        renderDynamicCriteria();
+        
         // Set edit button link
-        document.getElementById('editPlaylistBtn').href = `/playlists/edit/${playlistId}`;
+        document.getElementById('editPlaylistBtn').href = `/unified-playlists/edit/${playlistId}`;
         
     } catch (error) {
         console.error('Error loading playlist:', error);
@@ -346,6 +375,111 @@ function renderPlaylistSongs() {
     }).join('');
 }
 
+function updatePlaylistStatistics(data) {
+    // Add statistics display showing manual vs dynamic song counts
+    const playlistDescription = document.getElementById('playlistDescription');
+    if (playlistDescription && data) {
+        const originalText = playlist.description || 'No description';
+        const statsText = `${originalText} • Total: ${data.total_count} songs (${data.manual_count} manual, ${data.dynamic_count} dynamic)`;
+        playlistDescription.textContent = statsText;
+    }
+}
+
+function renderDynamicCriteria() {
+    const criteriaSection = document.getElementById('dynamicCriteriaSection');
+    const criteriaList = document.getElementById('dynamicCriteriaList');
+    
+    if (!playlist.dynamic_criteria || playlist.dynamic_criteria.length === 0) {
+        criteriaSection.style.display = 'none';
+        return;
+    }
+    
+    criteriaSection.style.display = 'block';
+    
+    criteriaList.innerHTML = playlist.dynamic_criteria.map(criteria => {
+        const includeCount = Object.keys(criteria.include_criteria || {}).length;
+        const excludeCount = Object.keys(criteria.exclude_criteria || {}).length;
+        
+        return `
+            <div class="border rounded p-3 mb-3 bg-light">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h6 class="mb-2">
+                            <i class="fas fa-filter me-2"></i>${criteria.name}
+                        </h6>
+                        <div class="small text-muted">
+                            ${includeCount > 0 ? `<span class="badge bg-success me-1">+${includeCount} include</span>` : ''}
+                            ${excludeCount > 0 ? `<span class="badge bg-danger me-1">-${excludeCount} exclude</span>` : ''}
+                        </div>
+                        <div class="mt-2">
+                            ${renderCriteriaSummary(criteria)}
+                        </div>
+                    </div>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-primary" onclick="editCriteria(${criteria.id})" title="Edit Criteria">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="deleteCriteria(${criteria.id})" title="Delete Criteria">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+function renderCriteriaSummary(criteria) {
+    const parts = [];
+    
+    // Include criteria
+    if (criteria.include_criteria) {
+        Object.entries(criteria.include_criteria).forEach(([field, values]) => {
+            if (Array.isArray(values) && values.length > 0) {
+                parts.push(`<span class="text-success">Include ${field}: ${values.slice(0, 3).join(', ')}${values.length > 3 ? '...' : ''}</span>`);
+            } else if (values && typeof values === 'object' && (values.min !== undefined || values.max !== undefined)) {
+                const range = [];
+                if (values.min !== undefined) range.push(`min: ${values.min}`);
+                if (values.max !== undefined) range.push(`max: ${values.max}`);
+                parts.push(`<span class="text-success">Include ${field}: ${range.join(', ')}</span>`);
+            }
+        });
+    }
+    
+    // Exclude criteria  
+    if (criteria.exclude_criteria) {
+        Object.entries(criteria.exclude_criteria).forEach(([field, values]) => {
+            if (Array.isArray(values) && values.length > 0) {
+                parts.push(`<span class="text-danger">Exclude ${field}: ${values.slice(0, 3).join(', ')}${values.length > 3 ? '...' : ''}</span>`);
+            } else if (values && typeof values === 'object' && (values.min !== undefined || values.max !== undefined)) {
+                const range = [];
+                if (values.min !== undefined) range.push(`min: ${values.min}`);
+                if (values.max !== undefined) range.push(`max: ${values.max}`);
+                parts.push(`<span class="text-danger">Exclude ${field}: ${range.join(', ')}</span>`);
+            }
+        });
+    }
+    
+    return parts.length > 0 ? `<div class="small">${parts.join('<br>')}</div>` : '<span class="text-muted small">No criteria defined</span>';
+}
+
+function addDynamicCriteria() {
+    // TODO: Open modal or redirect to criteria editor
+    notificationSystem.info("Coming Soon", "Dynamic criteria editing will be implemented next");
+}
+
+function editCriteria(criteriaId) {
+    // TODO: Open modal or redirect to criteria editor
+    notificationSystem.info("Coming Soon", "Dynamic criteria editing will be implemented next");
+}
+
+function deleteCriteria(criteriaId) {
+    if (!confirm('Are you sure you want to delete this criteria?')) return;
+    
+    // TODO: Implement criteria deletion
+    notificationSystem.info("Coming Soon", "Dynamic criteria deletion will be implemented next");
+}
+
 function setupSortable() {
     const container = document.getElementById('songTableBody');
     if (!container) return;
@@ -364,8 +498,8 @@ function setupSortable() {
             // Update shared player data
             window.playlistPlayer.songs = songs;
             
-            // Update backend
-            updatePlaylistOrder();
+            // Update backend with new order
+            updateUnifiedPlaylistOrder();
             
             // Re-render to update indices
             renderPlaylistSongs();
@@ -373,13 +507,13 @@ function setupSortable() {
     });
 }
 
-async function updatePlaylistOrder() {
+async function updateUnifiedPlaylistOrder() {
     try {
         const songIds = songs.map(song => song.id);
-        const response = await fetch(`/api/playlists/${playlistId}/order`, {
+        const response = await fetch(`/api/unified-playlists/${playlistId}/reorder`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ song_ids: songIds })
+            body: JSON.stringify({ song_order: songIds })
         });
         
         if (!response.ok) {
@@ -387,6 +521,7 @@ async function updatePlaylistOrder() {
         }
     } catch (error) {
         console.error('Error updating playlist order:', error);
+        notificationSystem.error("Error", 'Failed to update song order');
     }
 }
 </script>

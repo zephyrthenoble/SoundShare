@@ -303,19 +303,11 @@ class PlaylistPlayer {
     }
 
     updateTimeDisplay() {
-        const current = this.formatTime(this.audioPlayer.currentTime);
-        const total = this.formatTime(this.audioPlayer.duration);
+        const current = SoundShareUtils.formatTime(this.audioPlayer.currentTime);
+        const total = SoundShareUtils.formatTime(this.audioPlayer.duration);
         
         document.getElementById('currentTime').textContent = current;
         document.getElementById('totalTime').textContent = total;
-    }
-
-    formatTime(seconds) {
-        if (isNaN(seconds)) return '0:00';
-        
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 
     highlightCurrentSong() {
@@ -354,7 +346,7 @@ class PlaylistPlayer {
             document.getElementById('modalSongArtist').textContent = song.artist || '-';
             document.getElementById('modalSongAlbum').textContent = song.album || '-';
             document.getElementById('modalSongTrack').textContent = song.track_number ? `Track ${song.track_number}` : '-';
-            document.getElementById('modalSongDuration').textContent = song.duration ? this.formatTime(song.duration) : '-';
+            document.getElementById('modalSongDuration').textContent = song.duration ? SoundShareUtils.formatTime(song.duration) : '-';
             document.getElementById('modalSongGenre').textContent = song.genre || '-';
             document.getElementById('modalSongYear').textContent = song.year || '-';
             

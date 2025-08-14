@@ -326,7 +326,7 @@ async function loadPlaylistData() {
         
     } catch (error) {
         console.error('Error loading playlist:', error);
-        alert('Error loading playlist. Returning to playlists page.');
+        notificationSystem.error("Error", 'Error loading playlist. Returning to playlists page.');
         window.location.href = '/playlists';
     }
 }
@@ -542,14 +542,14 @@ async function rescanPlaylist() {
         const result = await response.json();
         
         // Show success message
-        alert(`Rescan completed!\n\nFound: ${result.song_count} songs\nFiles checked: ${result.files_checked}\nMissing files: ${result.missing_files}`);
+        notificationSystem.success("Rescan Complete", `Found: ${result.song_count} songs\nFiles checked: ${result.files_checked}\nMissing files: ${result.missing_files}`);
         
         // Reload songs
         await loadPlaylistSongs();
         
     } catch (error) {
         console.error('Error rescanning playlist:', error);
-        alert('Error rescanning playlist. Please try again.');
+        notificationSystem.error("Error", 'Error rescanning playlist. Please try again.');
     } finally {
         // Restore button state
         button.innerHTML = originalHtml;
@@ -901,7 +901,7 @@ async function showPlaylistSongInfo(songId) {
         
     } catch (error) {
         console.error('Error loading song details:', error);
-        alert('Error loading song details');
+        notificationSystem.error("Error", 'Error loading song details');
     }
 }
 

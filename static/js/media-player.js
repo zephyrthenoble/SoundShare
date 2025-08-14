@@ -219,25 +219,12 @@ class SoundShareMediaPlayer {
         const totalTimeEl = document.getElementById(`total-time-${songId}`);
         
         if (currentTimeEl) {
-            currentTimeEl.textContent = this.formatTime(this.audioPlayer.currentTime);
+            currentTimeEl.textContent = SoundShareUtils.formatTime(this.audioPlayer.currentTime);
         }
         
         if (totalTimeEl) {
-            totalTimeEl.textContent = this.formatTime(this.audioPlayer.duration);
+            totalTimeEl.textContent = SoundShareUtils.formatTime(this.audioPlayer.duration);
         }
-    }
-    
-    /**
-     * Format time in MM:SS format
-     * @param {number} seconds - Time in seconds
-     * @returns {string} Formatted time string
-     */
-    formatTime(seconds) {
-        if (isNaN(seconds)) return '0:00';
-        
-        const mins = Math.floor(seconds / 60);
-        const secs = Math.floor(seconds % 60);
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
     
     /**

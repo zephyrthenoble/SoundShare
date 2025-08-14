@@ -252,11 +252,11 @@ async function saveGroup() {
             document.getElementById('groupForm').reset();
             loadTagGroups();
         } else {
-            alert('Error saving group');
+            notify.error('Error saving group');
         }
     } catch (error) {
         console.error('Error saving group:', error);
-        alert('Error saving group');
+        notify.error('Error saving group');
     }
 }
 
@@ -284,11 +284,11 @@ async function saveTag() {
             document.getElementById('tagForm').reset();
             loadTagGroups();
         } else {
-            alert('Error saving tag');
+            notify.error('Error saving tag');
         }
     } catch (error) {
         console.error('Error saving tag:', error);
-        alert('Error saving tag');
+        notify.error('Error saving tag');
     }
 }
 
@@ -302,11 +302,11 @@ async function deleteGroup(groupId) {
             if (response.ok) {
                 loadTagGroups();
             } else {
-                alert('Error deleting group');
+                notify.error('Error deleting group');
             }
         } catch (error) {
             console.error('Error deleting group:', error);
-            alert('Error deleting group');
+            notify.error('Error deleting group');
         }
     }
 }
@@ -321,11 +321,11 @@ async function deleteTag(tagId) {
             if (response.ok) {
                 loadTagGroups();
             } else {
-                alert('Error deleting tag');
+                notify.error('Error deleting tag');
             }
         } catch (error) {
             console.error('Error deleting tag:', error);
-            alert('Error deleting tag');
+            notify.error('Error deleting tag');
         }
     }
 }

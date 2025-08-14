@@ -176,30 +176,11 @@ function updatePlaylistStats(stats) {
     }
     
     if (durationEl) {
-        durationEl.textContent = formatDuration(stats.totalDuration || 0);
+        durationEl.textContent = SoundShareUtils.formatDuration(stats.totalDuration || 0);
     }
     
     if (matchingCountEl && stats.matchingCount !== undefined) {
         matchingCountEl.textContent = stats.matchingCount || 0;
-    }
-}
-
-/**
- * Format duration in hours:minutes:seconds or minutes:seconds
- * @param {number} seconds - Duration in seconds
- * @returns {string} Formatted duration
- */
-function formatDuration(seconds) {
-    if (isNaN(seconds) || seconds < 0) return '0:00';
-    
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-    
-    if (hours > 0) {
-        return `${hours}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-    } else {
-        return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
 }
 
