@@ -113,10 +113,11 @@ class SongManager {
 
     async loadPlaylists() {
         try {
-            const response = await fetch("/api/playlists");
+            const response = await fetch("/api/unified-playlists");
             if (!response.ok) throw new Error("Failed to fetch playlists");
             const allPlaylists = await response.json();
-            this.playlists = allPlaylists.filter(p => p.type === "static");
+            // All unified playlists can accept manual songs, so no filtering needed
+            this.playlists = allPlaylists;
         } catch (error) {
             notificationSystem.error("Error", "Failed to load playlists");
             throw error;

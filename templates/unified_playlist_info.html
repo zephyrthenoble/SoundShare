@@ -4,8 +4,26 @@
 
 {% block content %}
 <div class="row">
+    <di<!-- Smart Criteria Section -->
+<div class="row mb-4" id="dynamicCriteriaSection" style="display: none;">
     <div class="col-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="card border-info">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="card-title mb-0">
+                    <i class="fas fa-filter me-2"></i>Smart Criteria
+                </h6>
+                <button class="btn btn-sm btn-outline-primary" onclick="addDynamicCriteria()">
+                    <i class="fas fa-plus me-1"></i>Add Criteria
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="dynamicCriteriaList">
+                    <!-- Smart criteria will be rendered here -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>       <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
                 <h1 id="playlistTitle">Loading...</h1>
                 <p class="text-muted" id="playlistDescription">Loading playlist information...</p>
@@ -376,11 +394,11 @@ function renderPlaylistSongs() {
 }
 
 function updatePlaylistStatistics(data) {
-    // Add statistics display showing manual vs dynamic song counts
+    // Add statistics display showing manual vs criteria-based song counts
     const playlistDescription = document.getElementById('playlistDescription');
     if (playlistDescription && data) {
         const originalText = playlist.description || 'No description';
-        const statsText = `${originalText} • Total: ${data.total_count} songs (${data.manual_count} manual, ${data.dynamic_count} dynamic)`;
+        const statsText = `${originalText} • Total: ${data.total_count} songs (${data.manual_count} manual, ${data.dynamic_count} criteria-based)`;
         playlistDescription.textContent = statsText;
     }
 }
@@ -465,7 +483,7 @@ function renderCriteriaSummary(criteria) {
 
 function addDynamicCriteria() {
     // TODO: Open modal or redirect to criteria editor
-    notificationSystem.info("Coming Soon", "Dynamic criteria editing will be implemented next");
+    notificationSystem.info("Coming Soon", "Smart criteria editing will be implemented next");
 }
 
 function editCriteria(criteriaId) {

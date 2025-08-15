@@ -14,7 +14,7 @@ from utils.constants import AUDIO_EXTENSIONS
 from services.audio_analyzer import AudioAnalyzer
 
 router = APIRouter()
-templates = Jinja2Templates(directory="src/soundshare/templates")
+templates = Jinja2Templates(directory="templates")
 audio_analyzer = AudioAnalyzer()
 
 async def _analyze_and_create_song(file_path: str, manually_added: bool = False):
@@ -490,6 +490,8 @@ async def scan_local_directories(paths: List[str], db: Session=Depends(get_db)):
                     print(f"Found audio file: {file_path}")
                             
         except Exception as e:
+            import traceback
+            print(traceback.format_exc())
             directory_errors += 1
             print(f"Error scanning directory {dir_path}: {str(e)}")
     
