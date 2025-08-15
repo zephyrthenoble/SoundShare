@@ -291,11 +291,6 @@ def _validate_and_clean_songs(db: Session):
 
 @router.get("/")
 async def get_songs(db: Session = Depends(get_db)):
-    """Get all songs with their tags, removing any songs whose files no longer exist."""
-    return _validate_and_clean_songs(db)
-
-@router.get("/with-folders")
-async def get_songs_with_folders(db: Session = Depends(get_db)):
     """Get all songs with their tags and properly extracted folder information using pathlib."""
     valid_songs = _validate_and_clean_songs(db)
     
@@ -734,6 +729,83 @@ async def remove_tag_from_song(song_id: int, tag_id: int, db: Session = Depends(
         db.commit()
     
     return {"message": "Tag removed from song"}
+
+class SongTagsUpdate(BaseModel):
+    tag_ids: List[int]
+
+class BulkTagUpdate(BaseModel):
+    song_ids: List[int]
+    tag_ids: List[int]
+    operation: str  # "add", "remove", or "overwrite"
+
+@router.put("/{song_id}/tags/batch")
+async def update_song_tags_batch(song_id: int, request: SongTagsUpdate, db: Session = Depends(get_db)):
+    """Update all tags for a song in batch (replaces existing tags)."""
+    song = db.query(Song).options(selectinload(Song.tags)).filter(Song.id == song_id).first()
+    if not song:
+        raise HTTPException(status_code=404, detail="Song not found")
+    
+    # Get the tags
+    if request.tag_ids:
+        tags = db.query(Tag).filter(Tag.id.in_(request.tag_ids)).all()
+        if len(tags) != len(request.tag_ids):
+            raise HTTPException(status_code=404, detail="Some tags not found")
+    else:
+        tags = []
+    
+    # Replace all tags
+    song.tags.clear()
+    song.tags.extend(tags)
+    
+    db.commit()
+    db.refresh(song)
+    
+    return song
+
+@router.put("/bulk-tags")
+async def update_bulk_tags(request: BulkTagUpdate, db: Session = Depends(get_db)):
+    """Perform bulk tag operations on multiple songs."""
+    if request.operation not in ["add", "remove", "overwrite"]:
+        raise HTTPException(status_code=400, detail="Invalid operation. Must be 'add', 'remove', or 'overwrite'")
+    
+    # Get the songs
+    songs = db.query(Song).options(selectinload(Song.tags)).filter(Song.id.in_(request.song_ids)).all()
+    if not songs:
+        raise HTTPException(status_code=404, detail="No songs found")
+    
+    # Get the tags if any specified
+    tags = []
+    if request.tag_ids:
+        tags = db.query(Tag).filter(Tag.id.in_(request.tag_ids)).all()
+        if len(tags) != len(request.tag_ids):
+            raise HTTPException(status_code=404, detail="Some tags not found")
+    
+    updated_songs = []
+    
+    for song in songs:
+        if request.operation == "add":
+            # Add tags (avoid duplicates)
+            existing_tag_ids = {tag.id for tag in song.tags}
+            for tag in tags:
+                if tag.id not in existing_tag_ids:
+                    song.tags.append(tag)
+        elif request.operation == "remove":
+            # Remove tags
+            song.tags = [tag for tag in song.tags if tag.id not in request.tag_ids]
+        elif request.operation == "overwrite":
+            # Replace all tags
+            song.tags.clear()
+            song.tags.extend(tags)
+        
+        updated_songs.append(song)
+    
+    db.commit()
+    
+    # Refresh all songs to get updated relationships
+    for song in updated_songs:
+        db.refresh(song)
+    
+    return {"updated_songs": updated_songs}
 
 @router.get("/{song_id}/preview")
 async def get_song_preview(song_id: int, segment: int = 0, db: Session = Depends(get_db)):

@@ -121,25 +121,30 @@
     </div>
 </div>
 
-<!-- Bulk Actions Toolbar -->
-<div class="card mb-3" id="bulkActionsToolbar" style="display: none;">
-    <div class="card-body py-2">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <span id="selectedCount" class="fw-bold">0 songs selected</span>
-            </div>
+<!-- Bulk Actions Floating Toolbar -->
+<div class="card shadow-lg" id="bulkActionsToolbar" style="display: none; position: fixed; top: 80px; right: 20px; z-index: 1050; max-width: 400px;">
+    <div class="card-body p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span id="selectedCount" class="fw-bold text-primary">0 songs selected</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection()" title="Clear Selection">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="d-grid gap-2">
             <div class="btn-group">
-                <button class="btn btn-sm btn-primary" onclick="addSelectedToPlaylist()">
+                <button class="btn btn-sm btn-primary" onclick="addSelectedToPlaylist()" title="Add to Playlist">
                     <i class="fas fa-plus"></i> Add to Playlist
                 </button>
-                <button class="btn btn-sm btn-secondary" onclick="tagSelectedSongs()">
+                <button class="btn btn-sm btn-secondary" onclick="tagSelectedSongs()" title="Tag Songs">
                     <i class="fas fa-tags"></i> Tag Songs
                 </button>
-                <button class="btn btn-sm btn-danger" onclick="deleteSelectedSongs()">
-                    <i class="fas fa-trash"></i> Delete
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-sm btn-info" onclick="rescanSelectedSongs()" title="Rescan">
+                    <i class="fas fa-sync-alt"></i> Rescan
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="clearSelection()">
-                    <i class="fas fa-times"></i> Clear Selection
+                <button class="btn btn-sm btn-danger" onclick="deleteSelectedSongs()" title="Delete">
+                    <i class="fas fa-trash"></i> Delete
                 </button>
             </div>
         </div>
@@ -148,7 +153,239 @@
 
 <div class="row">
     <div class="col-12">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <small class="text-muted selection-hint">
+                <i class="fas fa-info-circle"></i>
+                Tip: Use checkboxes for selection. Hold <kbd>Shift</kbd> and click to select ranges.
+            </small>
+        </div>
         {% include "components/song_table.html" %}
+    </div>
+</div>
+
+<style>
+/* Tag Management Styles */
+.tag-group-card {
+    border: 1px solid #dee2e6;
+    border-radius: 0.375rem;
+    margin-bottom: 0.75rem;
+}
+
+.tag-group-header {
+    background-color: #f8f9fa;
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: between;
+    align-items: center;
+}
+
+.tag-group-body {
+    padding: 0.75rem;
+}
+
+.tag-item {
+    display: inline-block;
+    margin: 0.125rem;
+    padding: 0.25rem 0.5rem;
+    border: 1px solid #6c757d;
+    border-radius: 0.75rem;
+    background-color: #fff;
+    color: #6c757d;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    font-size: 0.875rem;
+}
+
+.tag-item:hover {
+    border-color: #0d6efd;
+    color: #0d6efd;
+    transform: translateY(-1px);
+}
+
+.tag-item.selected {
+    background-color: #198754;
+    border-color: #198754;
+    color: #fff;
+}
+
+.tag-item.selected:hover {
+    background-color: #157347;
+    border-color: #146c43;
+}
+
+.add-tag-btn {
+    display: inline-block;
+    margin: 0.125rem;
+    padding: 0.25rem 0.5rem;
+    border: 2px dashed #6c757d;
+    border-radius: 0.75rem;
+    background-color: transparent;
+    color: #6c757d;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    font-size: 0.875rem;
+}
+
+.add-tag-btn:hover {
+    border-color: #0d6efd;
+    color: #0d6efd;
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+.tag-group-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: #495057;
+}
+
+.tag-group-description {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+</style>
+
+<!-- Tag Management Modal -->
+<div class="modal fade" id="tagManagementModal" tabindex="-1" aria-labelledby="tagManagementModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="tagManagementModalLabel">Manage Tags</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="tagManagementSongId" />
+                
+                <div class="mb-3">
+                    <h6 id="tagManagementSongName" class="text-muted"></h6>
+                </div>
+                
+                <div id="tagGroupsContainer">
+                    <!-- Tag groups will be populated here -->
+                </div>
+                
+                <div class="text-center mt-3" id="tagLoadingIndicator" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="saveTagsBtn">Save Changes</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Tag Management Modal -->
+<div class="modal fade" id="bulkTagManagementModal" tabindex="-1" aria-labelledby="bulkTagManagementModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="bulkTagManagementModalLabel">Bulk Tag Management</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="bulkTagSongIds" />
+                
+                <div class="mb-3">
+                    <h6 id="bulkTagSongCount" class="text-muted"></h6>
+                </div>
+                
+                <div id="bulkTagGroupsContainer">
+                    <!-- Tag groups will be populated here -->
+                </div>
+                
+                <div class="text-center mt-3" id="bulkTagLoadingIndicator" style="display: none;">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success" id="addTagsBtn">Add Tags</button>
+                <button type="button" class="btn btn-warning" id="removeTagsBtn">Remove Tags</button>
+                <button type="button" class="btn btn-danger" id="overwriteTagsBtn">Overwrite Tags</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add New Tag Modal -->
+<div class="modal fade" id="addNewTagModal" tabindex="-1" aria-labelledby="addNewTagModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="addNewTagModalLabel">Add New Tag</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="newTagGroupId" />
+                <div class="mb-3">
+                    <label for="newTagName" class="form-label">Tag Name</label>
+                    <input type="text" class="form-control" id="newTagName" placeholder="Enter tag name" required>
+                </div>
+                <div class="mb-3">
+                    <label for="newTagDescription" class="form-label">Description (Optional)</label>
+                    <textarea class="form-control" id="newTagDescription" rows="2" placeholder="Enter tag description"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="createNewTagBtn">Create Tag</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Rescan Songs Modal -->
+<div class="modal fade" id="rescanModal" tabindex="-1" aria-labelledby="rescanModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="rescanModalLabel">Rescan Songs</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="rescanInfo">0 songs selected</span>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">Rescan Mode</label>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="rescanMode" id="overwriteMode" value="overwrite">
+                        <label class="form-check-label" for="overwriteMode">
+                            <strong>Overwrite All Metadata</strong>
+                            <br><small class="text-muted">Replace all existing metadata with fresh analysis</small>
+                        </label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="rescanMode" id="fillMissingMode" value="fill_missing" checked>
+                        <label class="form-check-label" for="fillMissingMode">
+                            <strong>Fill Missing Metadata Only</strong>
+                            <br><small class="text-muted">Only update empty or missing fields, keep existing data</small>
+                        </label>
+                    </div>
+                </div>
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    This will re-analyze the audio files and may take some time for large selections.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info" id="applyRescanBtn">
+                    <i class="fas fa-sync-alt"></i> Rescan Songs
+                </button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -293,6 +530,39 @@ function setupModalListeners() {
             this.setCustomValidity('');
         }
     });
+    
+    // Tag management modal listeners
+    document.getElementById('saveTagsBtn').addEventListener('click', saveTagChanges);
+    document.getElementById('createNewTagBtn').addEventListener('click', createNewTag);
+    
+    // Bulk tag management modal listeners
+    document.getElementById('addTagsBtn').addEventListener('click', () => performBulkTagOperation('add'));
+    document.getElementById('removeTagsBtn').addEventListener('click', () => performBulkTagOperation('remove'));
+    document.getElementById('overwriteTagsBtn').addEventListener('click', () => performBulkTagOperation('overwrite'));
+    
+    // Rescan modal listeners
+    document.getElementById('applyRescanBtn').addEventListener('click', applyRescan);
+    
+    // Clear tag changes when modals are closed
+    document.getElementById('tagManagementModal').addEventListener('hidden.bs.modal', function() {
+        window.tagChanges = new Set();
+    });
+    
+    document.getElementById('bulkTagManagementModal').addEventListener('hidden.bs.modal', function() {
+        window.selectedTagsForBulk = new Set();
+    });
+    
+    // Focus on tag name input when add tag modal opens
+    document.getElementById('addNewTagModal').addEventListener('shown.bs.modal', function() {
+        document.getElementById('newTagName').focus();
+    });
+    
+    // Enter key submission for new tag modal
+    document.getElementById('newTagName').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+            createNewTag();
+        }
+    });
 }
 
 function initializeSongTable() {
@@ -323,7 +593,7 @@ function initializeSongTable() {
 
 async function loadSongs() {
     try {
-        const response = await fetch('/api/songs/with-folders');
+        const response = await fetch('/api/songs/');
         songs = await response.json();
         filteredSongs = [...songs];
         populateFilterDropdowns();
@@ -548,8 +818,9 @@ function tagSelectedSongs() {
         notificationSystem.warning("No Selection", "Please select songs first");
         return;
     }
-    // TODO: Implement bulk tagging functionality
-    notificationSystem.info("Tag Songs", `Would tag ${selectedIds.length} songs`);
+    
+    // Open bulk tag management modal
+    openBulkTagManagement(selectedIds);
 }
 
 function deleteSelectedSongs() {
@@ -719,8 +990,478 @@ function formatDateTime(dateString) {
 }
 
 function manageSongTags(songId) {
-    // TODO: Implement tag management functionality
-    notificationSystem.info("Manage Tags", `Would manage tags for song ${songId}`);
+    const song = songs.find(s => s.id === songId);
+    if (!song) {
+        notificationSystem.error("Error", "Song not found");
+        return;
+    }
+    
+    // Set song info in the modal
+    document.getElementById('tagManagementSongId').value = songId;
+    document.getElementById('tagManagementSongName').textContent = `Tags for: ${song.display_name}`;
+    
+    // Show loading and open modal
+    document.getElementById('tagLoadingIndicator').style.display = 'block';
+    document.getElementById('tagGroupsContainer').innerHTML = '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('tagManagementModal'));
+    modal.show();
+    
+    // Load tag groups and current song tags
+    loadTagGroupsForManagement(songId);
+}
+
+// Reusable tag loading function
+async function loadTagGroupsForManagement(songId) {
+    try {
+        // Load tag groups
+        const groupsResponse = await fetch('/api/tags/groups');
+        const tagGroups = await groupsResponse.json();
+        
+        // Load current song tags
+        const songResponse = await fetch(`/api/songs/${songId}`);
+        const song = await songResponse.json();
+        const currentTagIds = new Set(song.tags ? song.tags.map(tag => tag.id) : []);
+        
+        // Hide loading indicator
+        document.getElementById('tagLoadingIndicator').style.display = 'none';
+        
+        // Render tag groups
+        renderTagGroups(tagGroups, currentTagIds);
+        
+    } catch (error) {
+        console.error('Error loading tag groups:', error);
+        document.getElementById('tagLoadingIndicator').style.display = 'none';
+        document.getElementById('tagGroupsContainer').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                Error loading tags. Please try again.
+            </div>
+        `;
+    }
+}
+
+// Reusable tag group rendering
+function renderTagGroups(tagGroups, selectedTagIds, containerId = 'tagGroupsContainer', isForBulk = false) {
+    const container = document.getElementById(containerId);
+    
+    if (tagGroups.length === 0) {
+        container.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle"></i>
+                No tag groups found. Create some tag groups first.
+            </div>
+        `;
+        return;
+    }
+    
+    let html = '';
+    
+    tagGroups.forEach(group => {
+        const groupColor = group.color || '#007bff';
+        html += `
+            <div class="tag-group-card">
+                <div class="tag-group-header">
+                    <div>
+                        <h6 class="tag-group-title" style="color: ${groupColor};">${group.name}</h6>
+                        ${group.description ? `<p class="tag-group-description">${group.description}</p>` : ''}
+                    </div>
+                    <button class="btn btn-sm btn-outline-primary add-tag-btn" onclick="showAddNewTagModal(${group.id}, '${group.name}')">
+                        <i class="fas fa-plus"></i> Add
+                    </button>
+                </div>
+                <div class="tag-group-body">
+                    ${renderTagsForGroup(group.tags || [], selectedTagIds, isForBulk)}
+                </div>
+            </div>
+        `;
+    });
+    
+    container.innerHTML = html;
+}
+
+function renderTagsForGroup(tags, selectedTagIds, isForBulk = false) {
+    if (tags.length === 0) {
+        return '<span class="text-muted small">No tags in this group. Click "Add" to create the first tag.</span>';
+    }
+    
+    return tags.map(tag => {
+        const isSelected = selectedTagIds.has(tag.id);
+        const clickHandler = isForBulk ? 'toggleBulkTagSelection' : 'toggleTagSelection';
+        return `
+            <span class="tag-item ${isSelected ? 'selected' : ''}" 
+                  data-tag-id="${tag.id}" 
+                  onclick="${clickHandler}(this, ${tag.id})"
+                  title="${tag.description || tag.name}">
+                ${tag.name}
+            </span>
+        `;
+    }).join('');
+}
+
+function toggleTagSelection(element, tagId) {
+    element.classList.toggle('selected');
+    
+    // Store the change for later saving
+    if (!window.tagChanges) {
+        window.tagChanges = new Set();
+    }
+    
+    if (element.classList.contains('selected')) {
+        window.tagChanges.add(tagId);
+    } else {
+        window.tagChanges.delete(tagId);
+    }
+}
+
+function showAddNewTagModal(groupId, groupName) {
+    document.getElementById('newTagGroupId').value = groupId;
+    document.getElementById('addNewTagModalLabel').textContent = `Add New Tag to ${groupName}`;
+    document.getElementById('newTagName').value = '';
+    document.getElementById('newTagDescription').value = '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('addNewTagModal'));
+    modal.show();
+}
+
+async function createNewTag() {
+    const groupId = document.getElementById('newTagGroupId').value;
+    const name = document.getElementById('newTagName').value.trim();
+    const description = document.getElementById('newTagDescription').value.trim();
+    
+    if (!name) {
+        notificationSystem.error("Validation Error", "Tag name is required");
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/tags/', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: name,
+                description: description || null,
+                group_id: parseInt(groupId)
+            })
+        });
+        
+        if (response.ok) {
+            const newTag = await response.json();
+            
+            // Close the add tag modal
+            const addModal = bootstrap.Modal.getInstance(document.getElementById('addNewTagModal'));
+            addModal.hide();
+            
+            // Refresh the tag groups display
+            const songId = document.getElementById('tagManagementSongId').value;
+            loadTagGroupsForManagement(songId);
+            
+            notificationSystem.success("Success", `Tag "${name}" created successfully`);
+        } else {
+            const error = await response.json();
+            notificationSystem.error("Creation Failed", error.detail || "Failed to create tag");
+        }
+    } catch (error) {
+        console.error('Error creating tag:', error);
+        notificationSystem.error("Error", "An error occurred while creating the tag");
+    }
+}
+
+async function saveTagChanges() {
+    const songId = document.getElementById('tagManagementSongId').value;
+    
+    if (!songId) {
+        notificationSystem.error("Error", "No song selected");
+        return;
+    }
+    
+    // Get all currently selected tag IDs
+    const selectedTags = document.querySelectorAll('#tagGroupsContainer .tag-item.selected');
+    const selectedTagIds = Array.from(selectedTags).map(el => parseInt(el.dataset.tagId));
+    
+    try {
+        // Update song tags using a batch operation
+        const response = await fetch(`/api/songs/${songId}/tags/batch`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                tag_ids: selectedTagIds
+            })
+        });
+        
+        if (response.ok) {
+            const updatedSong = await response.json();
+            
+            // Update the song in our local arrays
+            const songIndex = songs.findIndex(s => s.id === parseInt(songId));
+            if (songIndex !== -1) {
+                songs[songIndex] = { ...songs[songIndex], tags: updatedSong.tags };
+                
+                const filteredIndex = filteredSongs.findIndex(s => s.id === parseInt(songId));
+                if (filteredIndex !== -1) {
+                    filteredSongs[filteredIndex] = { ...filteredSongs[filteredIndex], tags: updatedSong.tags };
+                }
+            }
+            
+            // Refresh the table
+            songTable.setSongs('songsTable', filteredSongs);
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('tagManagementModal'));
+            modal.hide();
+            
+            // Clear changes tracking
+            window.tagChanges = new Set();
+            
+            notificationSystem.success("Success", "Tags updated successfully");
+        } else {
+            const error = await response.json();
+            notificationSystem.error("Update Failed", error.detail || "Failed to update tags");
+        }
+    } catch (error) {
+        console.error('Error updating tags:', error);
+        notificationSystem.error("Error", "An error occurred while updating tags");
+    }
+}
+
+// Bulk Tag Management Functions
+function openBulkTagManagement(songIds) {
+    // Set song IDs and count in the modal
+    document.getElementById('bulkTagSongIds').value = JSON.stringify(songIds);
+    document.getElementById('bulkTagSongCount').textContent = `Managing tags for ${songIds.length} song${songIds.length === 1 ? '' : 's'}`;
+    
+    // Initialize selected tags tracking
+    window.selectedTagsForBulk = new Set();
+    
+    // Show loading and open modal
+    document.getElementById('bulkTagLoadingIndicator').style.display = 'block';
+    document.getElementById('bulkTagGroupsContainer').innerHTML = '';
+    
+    const modal = new bootstrap.Modal(document.getElementById('bulkTagManagementModal'));
+    modal.show();
+    
+    // Load tag groups for bulk operations
+    loadTagGroupsForBulkManagement();
+}
+
+async function loadTagGroupsForBulkManagement() {
+    try {
+        // Load tag groups
+        const groupsResponse = await fetch('/api/tags/groups');
+        const tagGroups = await groupsResponse.json();
+        
+        // Hide loading indicator
+        document.getElementById('bulkTagLoadingIndicator').style.display = 'none';
+        
+        // Render tag groups for bulk selection (no pre-selected tags)
+        renderTagGroups(tagGroups, new Set(), 'bulkTagGroupsContainer', true);
+        
+    } catch (error) {
+        console.error('Error loading tag groups for bulk:', error);
+        document.getElementById('bulkTagLoadingIndicator').style.display = 'none';
+        document.getElementById('bulkTagGroupsContainer').innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle"></i>
+                Error loading tags. Please try again.
+            </div>
+        `;
+    }
+}
+
+function toggleBulkTagSelection(element, tagId) {
+    element.classList.toggle('selected');
+    
+    // Store the change for bulk operations
+    if (!window.selectedTagsForBulk) {
+        window.selectedTagsForBulk = new Set();
+    }
+    
+    if (element.classList.contains('selected')) {
+        window.selectedTagsForBulk.add(tagId);
+    } else {
+        window.selectedTagsForBulk.delete(tagId);
+    }
+}
+
+async function performBulkTagOperation(operation) {
+    const songIdsStr = document.getElementById('bulkTagSongIds').value;
+    const songIds = JSON.parse(songIdsStr);
+    const selectedTagIds = Array.from(window.selectedTagsForBulk || []);
+    
+    if (selectedTagIds.length === 0) {
+        notificationSystem.warning("No Tags Selected", "Please select at least one tag to perform the operation");
+        return;
+    }
+    
+    const operationText = {
+        'add': 'add',
+        'remove': 'remove',
+        'overwrite': 'overwrite with'
+    }[operation];
+    
+    if (!confirm(`Are you sure you want to ${operationText} the selected tags for ${songIds.length} song${songIds.length === 1 ? '' : 's'}?`)) {
+        return;
+    }
+    
+    try {
+        // Perform bulk operation
+        const response = await fetch('/api/songs/bulk-tags', {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                song_ids: songIds,
+                tag_ids: selectedTagIds,
+                operation: operation
+            })
+        });
+        
+        if (response.ok) {
+            const result = await response.json();
+            
+            // Update local song arrays
+            result.updated_songs.forEach(updatedSong => {
+                const songIndex = songs.findIndex(s => s.id === updatedSong.id);
+                if (songIndex !== -1) {
+                    songs[songIndex] = { ...songs[songIndex], tags: updatedSong.tags };
+                    
+                    const filteredIndex = filteredSongs.findIndex(s => s.id === updatedSong.id);
+                    if (filteredIndex !== -1) {
+                        filteredSongs[filteredIndex] = { ...filteredSongs[filteredIndex], tags: updatedSong.tags };
+                    }
+                }
+            });
+            
+            // Refresh the table
+            songTable.setSongs('songsTable', filteredSongs);
+            
+            // Clear selection
+            songTable.clearSelection('songsTable');
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('bulkTagManagementModal'));
+            modal.hide();
+            
+            // Clear changes tracking
+            window.selectedTagsForBulk = new Set();
+            
+            notificationSystem.success("Success", `Bulk tag operation completed for ${result.updated_songs.length} song${result.updated_songs.length === 1 ? '' : 's'}`);
+        } else {
+            const error = await response.json();
+            notificationSystem.error("Operation Failed", error.detail || "Failed to perform bulk tag operation");
+        }
+    } catch (error) {
+        console.error('Error performing bulk tag operation:', error);
+        notificationSystem.error("Error", "An error occurred while performing the bulk operation");
+    }
+}
+
+// Rescan Functions
+function rescanSelectedSongs() {
+    const selectedIds = songTable.getSelectedSongs('songsTable');
+    if (selectedIds.length === 0) {
+        notificationSystem.warning("No Selection", "Please select songs first");
+        return;
+    }
+    
+    // Update the info text
+    document.getElementById('rescanInfo').textContent = `${selectedIds.length} song${selectedIds.length === 1 ? '' : 's'} selected for rescanning`;
+    
+    const modal = new bootstrap.Modal(document.getElementById('rescanModal'));
+    modal.show();
+}
+
+async function applyRescan() {
+    const selectedIds = songTable.getSelectedSongs('songsTable');
+    if (selectedIds.length === 0) {
+        notificationSystem.warning("No Selection", "Please select songs first");
+        return;
+    }
+    
+    // Get selected mode
+    const mode = document.querySelector('input[name="rescanMode"]:checked').value;
+    
+    // Close modal
+    const modal = bootstrap.Modal.getInstance(document.getElementById('rescanModal'));
+    modal.hide();
+    
+    // Show processing notification
+    const processingNotification = notificationSystem.info(
+        'Rescanning Songs', 
+        `Rescanning ${selectedIds.length} song${selectedIds.length === 1 ? '' : 's'} with ${mode} mode...`,
+        { duration: 10000 }
+    );
+    
+    try {
+        const response = await fetch('/api/songs/rescan', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                song_ids: selectedIds,
+                mode: mode
+            })
+        });
+        
+        if (response.ok) {
+            // Dismiss processing notification before showing completion notification
+            if (processingNotification && processingNotification.dismiss) {
+                processingNotification.dismiss();
+            }
+            
+            const result = await response.json();
+            const updated = result.updated || 0;
+            const errors = result.errors || [];
+            
+            let message = `Rescan complete! Updated ${updated} song${updated === 1 ? '' : 's'}.`;
+            if (errors.length > 0) {
+                message += ` ${errors.length} error${errors.length === 1 ? '' : 's'} occurred.`;
+            }
+            
+            if (updated > 0) {
+                notificationSystem.success('Rescan Complete', message, { duration: 10000 });
+                // Reload the songs to show updated metadata
+                loadSongs();
+                // Clear selection
+                songTable.clearSelection('songsTable');
+            } else {
+                notificationSystem.warning('Rescan Complete', message, { duration: 10000 });
+            }
+            
+            // Show errors if any
+            if (errors.length > 0) {
+                console.warn('Rescan errors:', errors);
+                // Show first few errors to user
+                const errorSample = errors.slice(0, 3).join('\n');
+                notificationSystem.error('Rescan Errors', `Some files could not be rescanned:\n${errorSample}${errors.length > 3 ? `\n...and ${errors.length - 3} more` : ''}`, { duration: 10000 });
+            }
+        } else {
+            // Dismiss processing notification before showing error notification
+            if (processingNotification && processingNotification.dismiss) {
+                processingNotification.dismiss();
+            }
+            
+            const errorText = await response.text();
+            notificationSystem.error(
+                'Rescan Failed', 
+                `Failed to rescan songs. ${response.status}: ${errorText}`,
+                { duration: 10000 }
+            );
+        }
+    } catch (error) {
+        // Dismiss processing notification
+        if (processingNotification && processingNotification.dismiss) {
+            processingNotification.dismiss();
+        }
+        notificationSystem.error('Rescan Failed', 'Failed to rescan songs. Please check your connection.', { duration: 10000 });
+        console.error('Error rescanning songs:', error);
+    }
 }
 </script>
 {% endblock %}

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -32,7 +32,7 @@ class TagUpdate(BaseModel):
 @router.get("/groups")
 async def get_tag_groups(db: Session = Depends(get_db)):
     """Get all tag groups with their tags."""
-    groups = db.query(TagGroup).all()
+    groups = db.query(TagGroup).options(selectinload(TagGroup.tags)).all()
     return groups
 
 @router.post("/groups")

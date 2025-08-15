@@ -49,6 +49,70 @@ body {
     pointer-events: none;
 }
 
+/* Floating bulk actions */
+#bulkActionsToolbar {
+    backdrop-filter: blur(10px);
+    background-color: rgba(255, 255, 255, 0.95) !important;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 12px;
+    transition: all 0.3s ease;
+    animation: slideInRight 0.4s ease-out;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+#bulkActionsToolbar:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15) !important;
+}
+
+#bulkActionsToolbar .btn {
+    border-radius: 6px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+}
+
+#bulkActionsToolbar .btn:hover {
+    transform: translateY(-1px);
+}
+
+/* Selection hint styles */
+.selection-hint {
+    background-color: rgba(13, 110, 253, 0.1);
+    border: 1px solid rgba(13, 110, 253, 0.2);
+    border-radius: 6px;
+    padding: 6px 12px;
+}
+
+.selection-hint kbd {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 3px;
+    padding: 2px 4px;
+    font-size: 0.8em;
+}
+
+/* Mobile responsiveness for floating toolbar */
+@media (max-width: 768px) {
+    #bulkActionsToolbar {
+        position: fixed !important;
+        top: auto !important;
+        bottom: 20px !important;
+        left: 20px !important;
+        right: 20px !important;
+        max-width: none !important;
+    }
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
     .btn-group .btn {

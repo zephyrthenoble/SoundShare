@@ -136,6 +136,7 @@ window.songTable = (function() {
             songs: [],
             filteredSongs: [],
             selectedSongs: new Set(),
+            lastSelectedIndex: null,
             expandedSongId: null,
             expandedSongRow: null,
             currentSortField: config.defaultSort || 'display_name',
@@ -296,7 +297,9 @@ window.songTable = (function() {
                 rowHTML += `
                     <td onclick="event.stopPropagation()">
                         <input type="checkbox" class="song-checkbox" data-song-id="${song.id}" 
-                               ${isSelected ? 'checked' : ''} onchange="songTable.toggleSongSelection('${tableId}', ${song.id})">
+                               ${isSelected ? 'checked' : ''} 
+                               onchange="songTable.toggleSongSelection('${tableId}', ${song.id}, event)"
+                               onclick="event.shiftKey && songTable.handleShiftClick('${tableId}', ${song.id}, event)">
                     </td>
                 `;
             }
@@ -324,7 +327,7 @@ window.songTable = (function() {
             
             // Folder column
             if (instance.config.showFolder) {
-                const folder = getFolder(song.file_path);
+                const folder = song.folder;
                 rowHTML += `
                     <td class="text-ellipsis" title="${folder}" style="max-width: 140px;">
                         <small class="text-muted">${folder}</small>
@@ -405,17 +408,65 @@ window.songTable = (function() {
         updateSortIndicators(tableId);
     }
     
-    // Toggle song selection
-    function toggleSongSelection(tableId, songId) {
+    // Toggle song selection with shift-click support
+    function toggleSongSelection(tableId, songId, event = null) {
         const instance = instances.get(tableId);
         if (!instance) return;
-        
+
+        // Handle shift-click for range selection
+        if (event && event.shiftKey && instance.lastSelectedIndex !== null) {
+            handleShiftClick(tableId, songId, event);
+            return;
+        }
+
+        // Store this as the last selected for future shift-clicks
+        const currentIndex = instance.filteredSongs.findIndex(song => song.id === songId);
+        instance.lastSelectedIndex = currentIndex;
+
         if (instance.selectedSongs.has(songId)) {
             instance.selectedSongs.delete(songId);
         } else {
             instance.selectedSongs.add(songId);
         }
+
+        updateSelectAllCheckbox(tableId);
+        instance.onSelectionChange(Array.from(instance.selectedSongs));
+    }
+
+    // Handle shift-click for range selection
+    function handleShiftClick(tableId, songId, event) {
+        const instance = instances.get(tableId);
+        if (!instance || instance.lastSelectedIndex === null) return;
+
+        event.preventDefault();
         
+        const currentIndex = instance.filteredSongs.findIndex(song => song.id === songId);
+        const startIndex = Math.min(instance.lastSelectedIndex, currentIndex);
+        const endIndex = Math.max(instance.lastSelectedIndex, currentIndex);
+
+        // Determine if we should select or deselect the range
+        // If the clicked item is currently selected, we'll deselect the range
+        const shouldSelect = !instance.selectedSongs.has(songId);
+
+        // Select/deselect all songs in the range
+        for (let i = startIndex; i <= endIndex; i++) {
+            const song = instance.filteredSongs[i];
+            if (song) {
+                if (shouldSelect) {
+                    instance.selectedSongs.add(song.id);
+                } else {
+                    instance.selectedSongs.delete(song.id);
+                }
+            }
+        }
+
+        // Update checkboxes
+        const checkboxes = document.querySelectorAll(`#${tableId} .song-checkbox`);
+        checkboxes.forEach(checkbox => {
+            const checkboxSongId = parseInt(checkbox.dataset.songId);
+            checkbox.checked = instance.selectedSongs.has(checkboxSongId);
+        });
+
         updateSelectAllCheckbox(tableId);
         instance.onSelectionChange(Array.from(instance.selectedSongs));
     }
@@ -854,21 +905,13 @@ window.songTable = (function() {
         const instance = instances.get(tableId);
         if (instance) {
             instance.selectedSongs.clear();
+            instance.lastSelectedIndex = null;
             renderTable(tableId);
             instance.onSelectionChange([]);
         }
     }
     
-    // Helper functions
-    function getFolder(filePath) {
-        if (!filePath) return '';
-        const parts = filePath.split('/');
-        if (parts.length > 1) {
-            parts.pop();
-            return parts[parts.length - 1];
-        }
-        return '';
-    }
+
     
     function formatDuration(seconds) {
         if (!seconds) return '';
@@ -901,6 +944,7 @@ window.songTable = (function() {
         filterSongs: filterSongs,
         renderTable: renderTable,
         toggleSongSelection: toggleSongSelection,
+        handleShiftClick: handleShiftClick,
         toggleSelectAll: toggleSelectAll,
         sortTable: sortTable,
         previewSong: previewSong,
