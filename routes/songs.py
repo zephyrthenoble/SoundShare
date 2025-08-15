@@ -666,11 +666,11 @@ async def get_scanned_directories(db: Session = Depends(get_db)):
 @router.put("/{song_id}")
 async def update_song(
     song_id: int,
-    display_name: Optional[str] = None,
-    artist: Optional[str] = None,
-    album: Optional[str] = None,
-    year: Optional[int] = None,
-    genre: Optional[str] = None,
+    display_name: Optional[str] = Form(None),
+    artist: Optional[str] = Form(None),
+    album: Optional[str] = Form(None),
+    year: Optional[str] = Form(None),  # Accept as string to handle empty values
+    genre: Optional[str] = Form(None),
     db: Session = Depends(get_db)
 ):
     """Update song metadata."""
@@ -678,16 +678,24 @@ async def update_song(
     if not song:
         raise HTTPException(status_code=404, detail="Song not found")
     
+    # Always update if parameter is provided (including empty strings)
     if display_name is not None:
         song.display_name = display_name
     if artist is not None:
-        song.artist = artist
+        song.artist = artist if artist.strip() else None
     if album is not None:
-        song.album = album
+        song.album = album if album.strip() else None
     if year is not None:
-        song.year = year
+        # Handle year conversion from string to int
+        if year and str(year).strip():
+            try:
+                song.year = int(year)
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Year must be a valid integer")
+        else:
+            song.year = None
     if genre is not None:
-        song.genre = genre
+        song.genre = genre if genre.strip() else None
     
     db.commit()
     db.refresh(song)

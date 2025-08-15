@@ -187,6 +187,20 @@ window.songTable = (function() {
             </th>
         `;
         
+        // Artist column (always shown)
+        headersHTML += `
+            <th width="160" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'artist')">
+                Artist <i class="fas fa-sort" id="sort-artist-${tableId}"></i>
+            </th>
+        `;
+        
+        // Album column (always shown)
+        headersHTML += `
+            <th width="160" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'album')">
+                Album <i class="fas fa-sort" id="sort-album-${tableId}"></i>
+            </th>
+        `;
+        
         // Folder column
         if (instance.config.showFolder) {
             headersHTML += `
@@ -195,13 +209,6 @@ window.songTable = (function() {
                 </th>
             `;
         }
-        
-        // Album column (always shown)
-        headersHTML += `
-            <th width="160" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'album')">
-                Album <i class="fas fa-sort" id="sort-album-${tableId}"></i>
-            </th>
-        `;
         
         // Duration column (always shown)
         headersHTML += `
@@ -228,10 +235,10 @@ window.songTable = (function() {
             `;
         }
         
-        // Audio Features column
+        // Audio Features column (Mood bars)
         if (instance.config.showAudioFeatures) {
             headersHTML += `
-                <th width="180">Audio Features</th>
+                <th width="180">Mood</th>
             `;
         }
         
@@ -301,6 +308,20 @@ window.songTable = (function() {
                 </td>
             `;
             
+            // Artist column
+            rowHTML += `
+                <td class="text-ellipsis" title="${song.artist || ''}" style="max-width: 160px;">
+                    ${song.artist || ''}
+                </td>
+            `;
+            
+            // Album column
+            rowHTML += `
+                <td class="text-ellipsis" title="${song.album || ''}" style="max-width: 160px;">
+                    ${song.album || ''}
+                </td>
+            `;
+            
             // Folder column
             if (instance.config.showFolder) {
                 const folder = getFolder(song.file_path);
@@ -310,13 +331,6 @@ window.songTable = (function() {
                     </td>
                 `;
             }
-            
-            // Album column
-            rowHTML += `
-                <td class="text-ellipsis" title="${song.album || ''}" style="max-width: 160px;">
-                    ${song.album || ''}
-                </td>
-            `;
             
             // Duration column
             rowHTML += `
@@ -584,7 +598,7 @@ window.songTable = (function() {
                 <div class="card border-0 bg-light">
                     <div class="card-body py-3">
                         <div class="row">
-                            <div class="col-md-6">
+                            <div class="col-md-8">
                                 <div class="d-flex justify-content-between align-items-start mb-2">
                                     <h6 class="mb-0">${song.display_name}</h6>
                                     ${instance.config.showEditButton ? `
@@ -593,14 +607,25 @@ window.songTable = (function() {
                                         </button>
                                     ` : ''}
                                 </div>
-                                <div class="text-muted small mb-2">
-                                    <div><strong>Artist:</strong> ${song.artist || 'Unknown'}</div>
-                                    <div><strong>Album:</strong> ${song.album || 'Unknown'}</div>
-                                    <div><strong>Year:</strong> ${song.year || 'Unknown'}</div>
-                                    <div><strong>Duration:</strong> ${formatDuration(song.duration)}</div>
-                                    ${song.tempo ? `<div><strong>Tempo:</strong> ${Math.round(song.tempo)} BPM</div>` : ''}
-                                    ${song.key ? `<div><strong>Key:</strong> ${song.key}</div>` : ''}
-                                    ${song.file_size ? `<div><strong>File Size:</strong> ${Math.round(song.file_size / 1024)} KB</div>` : ''}
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="text-muted small mb-2">
+                                            <div><strong>Artist:</strong> ${song.artist || 'Unknown'}</div>
+                                            <div><strong>Album:</strong> ${song.album || 'Unknown'}</div>
+                                            <div><strong>Year:</strong> ${song.year || 'Unknown'}</div>
+                                            <div><strong>Duration:</strong> ${formatDuration(song.duration)}</div>
+                                            ${song.tempo ? `<div><strong>Tempo:</strong> ${Math.round(song.tempo)} BPM</div>` : ''}
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="text-muted small mb-2">
+                                            ${song.key ? `<div><strong>Key:</strong> ${song.key}</div>` : ''}
+                                            ${song.file_size ? `<div><strong>File Size:</strong> ${Math.round(song.file_size / 1024)} KB</div>` : ''}
+                                            ${song.energy !== null && song.energy !== undefined ? `<div><strong>Energy:</strong> ${Math.round(song.energy * 100)}%</div>` : ''}
+                                            ${song.valence !== null && song.valence !== undefined ? `<div><strong>Valence:</strong> ${Math.round(song.valence * 100)}%</div>` : ''}
+                                            ${song.danceability !== null && song.danceability !== undefined ? `<div><strong>Danceability:</strong> ${Math.round(song.danceability * 100)}%</div>` : ''}
+                                        </div>
+                                    </div>
                                 </div>
                                 ${instance.config.showTags && song.tags ? `
                                     <div class="mt-2">
@@ -621,7 +646,7 @@ window.songTable = (function() {
                                     </div>
                                 ` : ''}
                             </div>
-                            <div class="col-md-6">
+                            <div class="col-md-4">
                                 <div class="mb-2">
                                     <small class="text-muted">Song Preview</small>
                                 </div>
@@ -679,18 +704,28 @@ window.songTable = (function() {
             
             previewAudio.isAutoPlaying = true;
             previewAudio.isShortSong = duration < 30;
+            previewAudio.currentSegment = 0;
             
             if (duration < 30) {
                 previewAudio.loop = true;
+                previewAudio.play();
             } else {
                 const previewControls = document.getElementById(`previewControls-${tableId}-${songId}`);
                 if (previewControls) {
                     previewControls.style.display = 'block';
                     
-                    // Auto-start preview
-                    playSegment(tableId, songId, 0);
+                    // Auto-start preview after a short delay
+                    setTimeout(() => {
+                        if (previewAudio.isAutoPlaying) {
+                            playSegment(tableId, songId, 0);
+                        }
+                    }, 100);
                 }
             }
+        });
+        
+        previewAudio.addEventListener('error', () => {
+            console.error('Error loading audio for song', songId);
         });
     }
     
@@ -711,25 +746,38 @@ window.songTable = (function() {
         const segment = segments[segmentIndex];
         if (!segment) return;
         
+        // Clear any existing timeouts
+        if (previewAudio.autoAdvanceTimeout) {
+            clearTimeout(previewAudio.autoAdvanceTimeout);
+        }
+        
         previewAudio.currentTime = segment.start;
-        previewAudio.play();
+        previewAudio.currentSegment = segmentIndex;
+        
+        previewAudio.play().catch(err => {
+            console.warn('Auto-play prevented by browser:', err);
+        });
         
         // Stop after segment duration if auto-playing
         if (previewAudio.isAutoPlaying) {
-            setTimeout(() => {
-                if (!previewAudio.paused) {
+            previewAudio.autoAdvanceTimeout = setTimeout(() => {
+                if (!previewAudio.paused && previewAudio.isAutoPlaying) {
                     previewAudio.pause();
                     
                     // Auto-advance to next segment
                     const nextSegment = segmentIndex + 1;
                     if (nextSegment < segments.length) {
-                        setTimeout(() => {
-                            playSegment(tableId, songId, nextSegment);
+                        previewAudio.autoAdvanceTimeout = setTimeout(() => {
+                            if (previewAudio.isAutoPlaying) {
+                                playSegment(tableId, songId, nextSegment);
+                            }
                         }, 1000);
                     } else {
                         // Loop back to start
-                        setTimeout(() => {
-                            playSegment(tableId, songId, 0);
+                        previewAudio.autoAdvanceTimeout = setTimeout(() => {
+                            if (previewAudio.isAutoPlaying) {
+                                playSegment(tableId, songId, 0);
+                            }
                         }, 1000);
                     }
                 }
@@ -740,6 +788,8 @@ window.songTable = (function() {
         const segmentButtons = document.querySelectorAll(`#segmentBar-${tableId}-${songId} .segment-btn`);
         segmentButtons.forEach((btn, index) => {
             btn.classList.toggle('active', index === segmentIndex);
+            btn.classList.toggle('btn-primary', index === segmentIndex);
+            btn.classList.toggle('btn-outline-primary', index !== segmentIndex);
         });
     }
     
@@ -767,6 +817,13 @@ window.songTable = (function() {
         audioElements.forEach(audio => {
             audio.pause();
             audio.currentTime = 0;
+            audio.isAutoPlaying = false;
+            
+            // Clear any auto-advance timeouts
+            if (audio.autoAdvanceTimeout) {
+                clearTimeout(audio.autoAdvanceTimeout);
+                audio.autoAdvanceTimeout = null;
+            }
         });
     }
     
@@ -828,10 +885,10 @@ window.songTable = (function() {
     }
     
     function getColumnCount(config) {
-        let count = 2; // Name and Album are always shown
+        let count = 4; // Name, Artist, Album, Duration are always shown
         if (config.showCheckboxes) count++;
         if (config.showFolder) count++;
-        if (config.showAudioFeatures) count += 2; // Duration, Tempo, Audio Features
+        if (config.showAudioFeatures) count += 2; // Tempo, Audio Features (Mood)
         if (config.showCreatedAt) count++;
         if (config.showTags) count++;
         return count;
