@@ -149,17 +149,6 @@ class ScanDirectoriesRequest(BaseModel):
 
 # Build a nested tree structure: {folder: {children:{...}, songs:[...]}}
 
-def _insert_path(root, song):
-    fp = Path(song.file_path)
-    parts = fp.parts[:-1]  # exclude filename
-    node = root
-    for part in parts[-6:]:  # limit depth stored to last 6 parts to avoid huge roots
-        node = node.setdefault(part, {"children": {}, "songs": []})["children"]
-    # attach at parent of file
-    parent_key = fp.parent.name or str(fp.parent)
-    parent_node = root.setdefault(parent_key, {"children": {}, "songs": []}) if parent_key not in root else root[parent_key]
-    parent_node.setdefault("songs", []).append({"id": song.id, "display_name": song.display_name})
-
 
 @router.get("/")
 async def get_library(db: Session = Depends(get_db)):

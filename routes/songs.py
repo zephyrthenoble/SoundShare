@@ -41,6 +41,180 @@ class ScanDirectoryRequest(BaseModel):
 router = APIRouter()
 audio_analyzer = AudioAnalyzer()
 
+# Helper functions for tag operations
+def _get_song_by_id(db: Session, song_id: int, load_tags: bool = False) -> Song:
+    """Get a single song by ID with optional tag loading."""
+    query = db.query(Song)
+    if load_tags:
+        query = query.options(selectinload(Song.tags))
+    
+    song = query.filter(Song.id == song_id).first()
+    if not song:
+        raise HTTPException(status_code=404, detail="Song not found")
+    return song
+
+def _get_tag_by_id(db: Session, tag_id: int) -> Tag:
+    """Get a single tag by ID."""
+    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    if not tag:
+        raise HTTPException(status_code=404, detail="Tag not found")
+    return tag
+
+def _validate_file_exists(file_path: str):
+    """Validate that a song file exists and handle cleanup if not."""
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Song file not found")
+
+def _get_songs_by_ids(db: Session, song_ids: List[int]) -> List[Song]:
+    """Get songs by IDs with tags preloaded."""
+    songs = db.query(Song).options(selectinload(Song.tags)).filter(Song.id.in_(song_ids)).all()
+    if not songs:
+        raise HTTPException(status_code=404, detail="No songs found")
+    return songs
+
+def _get_tags_by_ids(db: Session, tag_ids: List[int]) -> List[Tag]:
+    """Get tags by IDs and validate all exist."""
+    if not tag_ids:
+        return []
+    
+    tags = db.query(Tag).filter(Tag.id.in_(tag_ids)).all()
+    if len(tags) != len(tag_ids):
+        raise HTTPException(status_code=404, detail="Some tags not found")
+    return tags
+
+def _apply_tag_operation(song: Song, tags: List[Tag], operation: str, tag_ids_to_remove: List[int] = None):
+    """Apply a tag operation to a single song."""
+    if operation == "add":
+        # Add tags (avoid duplicates)
+        existing_tag_ids = {tag.id for tag in song.tags}
+        for tag in tags:
+            if tag.id not in existing_tag_ids:
+                song.tags.append(tag)
+    elif operation in ["remove"]:
+        # Remove tags by IDs
+        if tag_ids_to_remove:
+            song.tags = [tag for tag in song.tags if tag.id not in tag_ids_to_remove]
+        else:
+            # Remove specific tag objects
+            for tag in tags:
+                if tag in song.tags:
+                    song.tags.remove(tag)
+    elif operation in ["overwrite", "replace"]:
+        # Replace all tags
+        song.tags.clear()
+        song.tags.extend(tags)
+    else:
+        raise HTTPException(status_code=400, detail=f"Invalid operation: {operation}")
+
+def _bulk_update_song_tags(db: Session, song_ids: List[int], tag_ids: List[int], operation: str) -> List[Song]:
+    """Perform bulk tag operations on multiple songs."""
+    # Validate operation
+    valid_operations = ["add", "remove", "overwrite", "replace"]
+    if operation not in valid_operations:
+        raise HTTPException(status_code=400, detail=f"Invalid operation. Must be one of: {', '.join(valid_operations)}")
+    
+    # Get songs and tags
+    songs = _get_songs_by_ids(db, song_ids)
+    tags = _get_tags_by_ids(db, tag_ids)
+    
+    # Apply operation to each song
+    for song in songs:
+        _apply_tag_operation(song, tags, operation, tag_ids)
+    
+    db.commit()
+    
+    # Refresh all songs to get updated relationships
+    for song in songs:
+        db.refresh(song)
+    
+    return songs
+
+def _remove_songs_helper(db: Session, songs_to_remove: List[Song]) -> tuple[int, List[str], List[str]]:
+    """
+    Helper function to remove songs from the database.
+    Returns (removed_count, removed_paths, errors).
+    """
+    removed = 0
+    errors = []
+    removed_paths = []
+    
+    for song in songs_to_remove:
+        try:
+            removed_paths.append(song.file_path)  # Store path for undo functionality
+            db.delete(song)
+            removed += 1
+            print(f"Removed song ID {song.id}: {song.file_path}")
+        except Exception as e:
+            errors.append(f"Failed to remove song ID {song.id}: {str(e)}")
+            print(f"Error removing song ID {song.id}: {str(e)}")
+    
+    if songs_to_remove:
+        try:
+            db.commit()
+            print(f"Successfully removed {removed} songs")
+        except Exception as e:
+            db.rollback()
+            error_msg = f"Failed to commit song removals: {str(e)}"
+            errors.append(error_msg)
+            print(error_msg)
+            removed = 0
+            removed_paths = []
+    
+    return removed, removed_paths, errors
+
+def _find_audio_files(directory_path: str, recursive: bool = True) -> List[str]:
+    """
+    Find all valid audio files in a directory.
+    Returns list of file paths.
+    """
+    valid_extensions = {'.mp3', '.wav', '.flac', '.m4a', '.ogg', '.wma'}
+    audio_files = []
+    
+    if recursive:
+        for root, dirs, files in os.walk(directory_path):
+            for file in files:
+                if Path(file).suffix.lower() in valid_extensions:
+                    full_path = os.path.join(root, file)
+                    # Check file size - skip zero-length files
+                    try:
+                        if os.path.getsize(full_path) > 0:
+                            audio_files.append(full_path)
+                    except OSError:
+                        continue  # Skip files we can't read
+    else:
+        for file in os.listdir(directory_path):
+            file_path = os.path.join(directory_path, file)
+            if os.path.isfile(file_path) and Path(file).suffix.lower() in valid_extensions:
+                # Check file size - skip zero-length files
+                try:
+                    if os.path.getsize(file_path) > 0:
+                        audio_files.append(file_path)
+                except OSError:
+                    continue  # Skip files we can't read
+    
+    return audio_files
+
+def _update_scan_record(db: Session, directory_path: str, recursive: bool, songs_found: int, songs_added: int, errors_count: int):
+    """Update or create a scan directory record."""
+    existing_scan = db.query(ScannedDirectory).filter(
+        ScannedDirectory.directory_path == directory_path
+    ).first()
+    
+    if existing_scan:
+        existing_scan.last_scanned = datetime.utcnow()
+        existing_scan.songs_found = songs_found
+        existing_scan.songs_added = songs_added
+        existing_scan.errors_count = errors_count
+    else:
+        new_scan = ScannedDirectory(
+            directory_path=directory_path,
+            recursive=recursive,
+            songs_found=songs_found,
+            songs_added=songs_added,
+            errors_count=errors_count
+        )
+        db.add(new_scan)
+
 def _validate_audio_file(file_path: str):
     """
     Validate if a file is a valid audio file.
@@ -82,6 +256,50 @@ def _process_year_value(year_value):
             return None
     return None
 
+def _create_song_object_from_analysis(analysis: dict, file_path: str, manually_added: bool = True) -> Song:
+    """
+    Create a Song object from audio analysis data.
+    """
+    file_info = Path(file_path)
+    filename = file_info.name
+    file_size = file_info.stat().st_size
+    
+    # Use metadata title if available, otherwise use parsed title or filename
+    final_display_name = (
+        analysis.get('title') or
+        analysis.get('parsed_title') or
+        filename
+    )
+    
+    # Process year value
+    year_value = _process_year_value(analysis.get('year'))
+    
+    # Get track number from metadata or filename parsing
+    track_number = (
+        analysis.get('track') or 
+        analysis.get('parsed_track')
+    )
+    
+    # Create song record with full metadata
+    return Song(
+        filename=filename,
+        display_name=final_display_name,
+        file_path=file_path,
+        file_size=file_size,
+        duration=analysis.get('duration'),
+        tempo=analysis.get('tempo'),
+        key=analysis.get('key'),
+        energy=analysis.get('energy', 0.5),
+        valence=analysis.get('valence', 0.5),
+        danceability=analysis.get('danceability', 0.5),
+        artist=analysis.get('artist'),
+        album=analysis.get('album'),
+        year=year_value,
+        genre=analysis.get('genre'),
+        track_number=track_number,
+        manually_added=manually_added
+    )
+
 async def _analyze_and_create_song(file_path: str, manually_added: bool = True):
     """
     Analyze a single audio file and create a Song object with full metadata.
@@ -99,78 +317,13 @@ async def _analyze_and_create_song(file_path: str, manually_added: bool = True):
         except Exception as e:
             return None, f"Failed to analyze audio for {file_path}: {str(e)}"
         
-        # Get filename and file info
-        file_info = Path(file_path)
-        filename = file_info.name
-        file_size = file_info.stat().st_size
-        
-        # Use metadata title if available, otherwise use parsed title or filename
-        final_display_name = (
-            analysis.get('title') or
-            analysis.get('parsed_title') or
-            filename
-        )
-        
-        # Process year value
-        year_value = _process_year_value(analysis.get('year'))
-        
-        # Get track number from metadata or filename parsing
-        track_number = (
-            analysis.get('track') or 
-            analysis.get('parsed_track')
-        )
-        
-        # Create song record with full metadata
-        song = Song(
-            filename=filename,
-            display_name=final_display_name,
-            file_path=file_path,
-            file_size=file_size,
-            duration=analysis.get('duration'),
-            tempo=analysis.get('tempo'),
-            key=analysis.get('key'),
-            energy=analysis.get('energy', 0.5),
-            valence=analysis.get('valence', 0.5),
-            danceability=analysis.get('danceability', 0.5),
-            artist=analysis.get('artist'),
-            album=analysis.get('album'),
-            year=year_value,
-            genre=analysis.get('genre'),
-            track_number=track_number,
-            manually_added=manually_added
-        )
-        
-        print(f"Analyzed song: {final_display_name} from {file_path}")
+        song = _create_song_object_from_analysis(analysis, file_path, manually_added)
+        print(f"Analyzed song: {song.display_name} from {file_path}")
         return song, None
         
     except Exception as e:
         return None, f"Unexpected error processing {file_path}: {str(e)}"
 
-async def _create_songs_from_paths(file_paths: List[str], db: Session, manually_added: bool = True):
-    """
-    Shared function to create song records from file paths with full metadata analysis.
-    Returns (added_songs, errors) tuple.
-    """
-    added_songs = []
-    errors = []
-
-    print(f"Processing {len(file_paths)} file paths, manually_added={manually_added}")
-    
-    for file_path in file_paths:
-        # Check if song already exists
-        existing_song = db.query(Song).filter(Song.file_path == file_path).first()
-        if existing_song:
-            errors.append(f"Song already exists in database: {file_path}")
-            continue
-
-        # Analyze and create song
-        song, error = await _analyze_and_create_song(file_path, manually_added)
-        if error:
-            errors.append(error)
-        else:
-            added_songs.append(song)
-
-    return added_songs, errors
 
 async def _create_song_from_file_path(file_path: str, db: Session, manually_added: bool = True, skip_existing: bool = True):
     """
@@ -195,47 +348,7 @@ async def _create_song_from_file_path(file_path: str, db: Session, manually_adde
         except Exception as e:
             return None, f"{file_path}: Failed to analyze audio - {str(e)}"
         
-        # Get file info
-        file_info = Path(file_path)
-        filename = file_info.name
-        file_size = file_info.stat().st_size
-        
-        # Use metadata title if available, otherwise use parsed title or filename
-        final_display_name = (
-            analysis.get('title') or 
-            analysis.get('parsed_title') or 
-            filename
-        )
-        
-        # Process year value
-        year_value = _process_year_value(analysis.get('year'))
-        
-        # Get track number from metadata or filename parsing
-        track_number = (
-            analysis.get('track') or 
-            analysis.get('parsed_track')
-        )
-        
-        # Create song record
-        song = Song(
-            filename=filename,
-            display_name=final_display_name,
-            file_path=file_path,
-            file_size=file_size,
-            duration=analysis.get('duration'),
-            tempo=analysis.get('tempo'),
-            key=analysis.get('key'),
-            energy=analysis.get('energy', 0.5),
-            valence=analysis.get('valence', 0.5),
-            danceability=analysis.get('danceability', 0.5),
-            artist=analysis.get('artist'),
-            album=analysis.get('album'),
-            year=year_value,
-            genre=analysis.get('genre'),
-            track_number=track_number,
-            manually_added=manually_added
-        )
-        
+        song = _create_song_object_from_analysis(analysis, file_path, manually_added)
         return song, None
         
     except Exception as e:
@@ -338,13 +451,11 @@ async def get_songs(db: Session = Depends(get_db)):
     
     return enhanced_songs
 
+
 @router.get("/{song_id}")
 async def get_song(song_id: int, db: Session = Depends(get_db)):
     """Get a specific song by ID."""
-    song = db.query(Song).options(selectinload(Song.tags)).filter(Song.id == song_id).first()
-    if not song:
-        raise HTTPException(status_code=404, detail="Song not found")
-    return song
+    return _get_song_by_id(db, song_id, load_tags=True)
 
 @router.post("/remove")
 async def remove_songs(
@@ -354,24 +465,34 @@ async def remove_songs(
     """
     Remove songs by file paths (for undo functionality).
     """
-    removed = 0
-    errors = []
     if len(songs.paths) == 0:
         raise HTTPException(status_code=400, detail="No song paths provided")
-    print(f"Removing songs: {songs.paths}")
+    
+    print(f"Removing songs by paths: {songs.paths}")
+    
+    # Find songs by file paths
+    songs_to_remove = []
+    not_found_paths = []
+    
     for file_path in songs.paths:
-        # Find song by file path
         existing_song = db.query(Song).filter(Song.file_path == file_path).first()
         if existing_song:
-            db.delete(existing_song)
-            removed += 1
+            songs_to_remove.append(existing_song)
         else:
-            errors.append(f"Song not found in database: {file_path}")
-
-    db.commit()
+            not_found_paths.append(file_path)
+    
+    # Use helper function to remove songs
+    removed, removed_paths, errors = _remove_songs_helper(db, songs_to_remove)
+    
+    # Add not found errors
+    for path in not_found_paths:
+        errors.append(f"Song not found in database: {path}")
+    
     print(f"Removed songs: {removed}")
-    print(f"Errors: {errors}")
-    return {"removed": removed, "errors": errors}
+    if errors:
+        print(f"Errors: {errors}")
+    
+    return {"removed": removed, "errors": errors, "removed_paths": removed_paths}
 
 @router.post("/remove-by-id")
 async def remove_songs_by_id(
@@ -381,30 +502,34 @@ async def remove_songs_by_id(
     """
     Remove songs by IDs (more reliable than file paths).
     """
-    removed = 0
-    errors = []
-    removed_paths = []
-    
     if len(songs.ids) == 0:
         raise HTTPException(status_code=400, detail="No song IDs provided")
     
     print(f"Removing songs by ID: {songs.ids}")
     
+    # Find songs by IDs
+    songs_to_remove = []
+    not_found_ids = []
+    
     for song_id in songs.ids:
-        # Find song by ID
         existing_song = db.query(Song).filter(Song.id == song_id).first()
         if existing_song:
-            removed_paths.append(existing_song.file_path)  # Store path for undo
-            db.delete(existing_song)
-            removed += 1
-            print(f"Removed song ID {song_id}: {existing_song.file_path}")
+            songs_to_remove.append(existing_song)
         else:
-            errors.append(f"Song not found with ID: {song_id}")
-            print(f"Song not found with ID: {song_id}")
-
-    db.commit()
+            not_found_ids.append(song_id)
+    
+    # Use helper function to remove songs
+    removed, removed_paths, errors = _remove_songs_helper(db, songs_to_remove)
+    
+    # Add not found errors
+    for song_id in not_found_ids:
+        errors.append(f"Song not found with ID: {song_id}")
+        print(f"Song not found with ID: {song_id}")
+    
     print(f"Removed songs: {removed}")
-    print(f"Errors: {errors}")
+    if errors:
+        print(f"Errors: {errors}")
+    
     return {"removed": removed, "errors": errors, "removed_paths": removed_paths}
 
 @router.post("/rescan")
@@ -552,54 +677,12 @@ async def scan_directory(
     if not os.path.isdir(request.directory_path):
         raise HTTPException(status_code=400, detail="Path is not a directory")
     
-    # Check if directory has been scanned before
-    existing_scan = db.query(ScannedDirectory).filter(
-        ScannedDirectory.directory_path == request.directory_path
-    ).first()
-    
     # Find audio files
-    valid_extensions = {'.mp3', '.wav', '.flac', '.m4a', '.ogg', '.wma'}
-    audio_files = []
-    
-    if request.recursive:
-        for root, dirs, files in os.walk(request.directory_path):
-            for file in files:
-                if Path(file).suffix.lower() in valid_extensions:
-                    full_path = os.path.join(root, file)
-                    # Check file size - skip zero-length files
-                    try:
-                        if os.path.getsize(full_path) > 0:
-                            audio_files.append(full_path)
-                    except OSError:
-                        continue  # Skip files we can't read
-    else:
-        for file in os.listdir(request.directory_path):
-            file_path = os.path.join(request.directory_path, file)
-            if os.path.isfile(file_path) and Path(file).suffix.lower() in valid_extensions:
-                # Check file size - skip zero-length files
-                try:
-                    if os.path.getsize(file_path) > 0:
-                        audio_files.append(file_path)
-                except OSError:
-                    continue  # Skip files we can't read
+    audio_files = _find_audio_files(request.directory_path, request.recursive)
     
     if not audio_files:
         # Update or create scan record
-        if existing_scan:
-            existing_scan.last_scanned = datetime.utcnow()
-            existing_scan.songs_found = 0
-            existing_scan.songs_added = 0
-            existing_scan.errors_count = 0
-        else:
-            new_scan = ScannedDirectory(
-                directory_path=request.directory_path,
-                recursive=request.recursive,
-                songs_found=0,
-                songs_added=0,
-                errors_count=0
-            )
-            db.add(new_scan)
-        
+        _update_scan_record(db, request.directory_path, request.recursive, 0, 0, 0)
         db.commit()
         return {
             "added_songs": [],
@@ -628,35 +711,17 @@ async def scan_directory(
             db.refresh(song)
     
     # Update or create scan record
-    if existing_scan:
-        existing_scan.last_scanned = datetime.utcnow()
-        existing_scan.songs_found = len(audio_files)
-        existing_scan.songs_added = len(added_songs)
-        existing_scan.errors_count = len(errors)
-    else:
-        new_scan = ScannedDirectory(
-            directory_path=request.directory_path,
-            recursive=request.recursive,
-            songs_found=len(audio_files),
-            songs_added=len(added_songs),
-            errors_count=len(errors)
-        )
-        db.add(new_scan)
-    
+    _update_scan_record(db, request.directory_path, request.recursive, len(audio_files), len(added_songs), len(errors))
     db.commit()
     
     return {
         "added_songs": added_songs,
         "errors": errors,
         "summary": f"Scanned directory: {request.directory_path}. Found {len(audio_files)} files, added {len(added_songs)} songs, {len(errors)} errors",
-        "is_rescan": existing_scan is not None
+        "is_rescan": db.query(ScannedDirectory).filter(ScannedDirectory.directory_path == request.directory_path).first() is not None
     }
 
-@router.get("/scanned-directories")
-async def get_scanned_directories(db: Session = Depends(get_db)):
-    """Get list of previously scanned directories."""
-    directories = db.query(ScannedDirectory).order_by(ScannedDirectory.last_scanned.desc()).all()
-    return directories
+
 
 @router.put("/{song_id}")
 async def update_song(
@@ -669,9 +734,7 @@ async def update_song(
     db: Session = Depends(get_db)
 ):
     """Update song metadata."""
-    song = db.query(Song).filter(Song.id == song_id).first()
-    if not song:
-        raise HTTPException(status_code=404, detail="Song not found")
+    song = _get_song_by_id(db, song_id)
     
     # Always update if parameter is provided (including empty strings)
     if display_name is not None:
@@ -699,34 +762,22 @@ async def update_song(
 @router.post("/{song_id}/tags/{tag_id}")
 async def add_tag_to_song(song_id: int, tag_id: int, db: Session = Depends(get_db)):
     """Add a tag to a song."""
-    song = db.query(Song).filter(Song.id == song_id).first()
-    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    song = _get_song_by_id(db, song_id, load_tags=True)
+    tag = _get_tag_by_id(db, tag_id)
     
-    if not song:
-        raise HTTPException(status_code=404, detail="Song not found")
-    if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
-    
-    if tag not in song.tags:
-        song.tags.append(tag)
-        db.commit()
+    _apply_tag_operation(song, [tag], "add")
+    db.commit()
     
     return {"message": "Tag added to song"}
 
 @router.delete("/{song_id}/tags/{tag_id}")
 async def remove_tag_from_song(song_id: int, tag_id: int, db: Session = Depends(get_db)):
     """Remove a tag from a song."""
-    song = db.query(Song).filter(Song.id == song_id).first()
-    tag = db.query(Tag).filter(Tag.id == tag_id).first()
+    song = _get_song_by_id(db, song_id, load_tags=True)
+    tag = _get_tag_by_id(db, tag_id)
     
-    if not song:
-        raise HTTPException(status_code=404, detail="Song not found")
-    if not tag:
-        raise HTTPException(status_code=404, detail="Tag not found")
-    
-    if tag in song.tags:
-        song.tags.remove(tag)
-        db.commit()
+    _apply_tag_operation(song, [tag], "remove")
+    db.commit()
     
     return {"message": "Tag removed from song"}
 
@@ -741,85 +792,24 @@ class BulkTagUpdate(BaseModel):
 @router.put("/{song_id}/tags/batch")
 async def update_song_tags_batch(song_id: int, request: SongTagsUpdate, db: Session = Depends(get_db)):
     """Update all tags for a song in batch (replaces existing tags)."""
-    song = db.query(Song).options(selectinload(Song.tags)).filter(Song.id == song_id).first()
-    if not song:
-        raise HTTPException(status_code=404, detail="Song not found")
-    
-    # Get the tags
-    if request.tag_ids:
-        tags = db.query(Tag).filter(Tag.id.in_(request.tag_ids)).all()
-        if len(tags) != len(request.tag_ids):
-            raise HTTPException(status_code=404, detail="Some tags not found")
-    else:
-        tags = []
-    
-    # Replace all tags
-    song.tags.clear()
-    song.tags.extend(tags)
-    
-    db.commit()
-    db.refresh(song)
-    
-    return song
+    songs = _bulk_update_song_tags(db, [song_id], request.tag_ids, "overwrite")
+    return songs[0]
 
 @router.put("/bulk-tags")
 async def update_bulk_tags(request: BulkTagUpdate, db: Session = Depends(get_db)):
     """Perform bulk tag operations on multiple songs."""
-    if request.operation not in ["add", "remove", "overwrite"]:
-        raise HTTPException(status_code=400, detail="Invalid operation. Must be 'add', 'remove', or 'overwrite'")
-    
-    # Get the songs
-    songs = db.query(Song).options(selectinload(Song.tags)).filter(Song.id.in_(request.song_ids)).all()
-    if not songs:
-        raise HTTPException(status_code=404, detail="No songs found")
-    
-    # Get the tags if any specified
-    tags = []
-    if request.tag_ids:
-        tags = db.query(Tag).filter(Tag.id.in_(request.tag_ids)).all()
-        if len(tags) != len(request.tag_ids):
-            raise HTTPException(status_code=404, detail="Some tags not found")
-    
-    updated_songs = []
-    
-    for song in songs:
-        if request.operation == "add":
-            # Add tags (avoid duplicates)
-            existing_tag_ids = {tag.id for tag in song.tags}
-            for tag in tags:
-                if tag.id not in existing_tag_ids:
-                    song.tags.append(tag)
-        elif request.operation == "remove":
-            # Remove tags
-            song.tags = [tag for tag in song.tags if tag.id not in request.tag_ids]
-        elif request.operation == "overwrite":
-            # Replace all tags
-            song.tags.clear()
-            song.tags.extend(tags)
-        
-        updated_songs.append(song)
-    
-    db.commit()
-    
-    # Refresh all songs to get updated relationships
-    for song in updated_songs:
-        db.refresh(song)
-    
+    updated_songs = _bulk_update_song_tags(db, request.song_ids, request.tag_ids, request.operation)
     return {"updated_songs": updated_songs}
 
 @router.get("/{song_id}/preview")
 async def get_song_preview(song_id: int, segment: int = 0, db: Session = Depends(get_db)):
     """Get a preview segment of a song (0-4 for the 5 segments)."""
-    song = db.query(Song).filter(Song.id == song_id).first()
-    if not song:
-        raise HTTPException(status_code=404, detail="Song not found")
+    song = _get_song_by_id(db, song_id)
     print(f"song id: {song.id}")
     print(f"song file path: {song.file_path}")
 
     if not os.path.exists(song.file_path):
-
         await _delete_song(song_id, db)
-        
         raise HTTPException(status_code=404, detail="Song file not found")
     
     print("found song")
@@ -844,17 +834,12 @@ async def get_song_preview(song_id: int, segment: int = 0, db: Session = Depends
 @router.get("/{song_id}/audio")
 async def get_song_audio(song_id: int, db: Session = Depends(get_db)):
     """Get the full audio file for a song."""
-    song = db.query(Song).filter(Song.id == song_id).first()
-    if not song:
-        raise HTTPException(status_code=404, detail="Song not found")
-    
-    file_path = song.file_path
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Song file not found")
+    song = _get_song_by_id(db, song_id)
+    _validate_file_exists(song.file_path)
     
     # Return the full audio file
     return FileResponse(
-        file_path,
+        song.file_path,
         media_type="audio/mpeg",
         headers={"Content-Disposition": f"inline; filename={song.display_name}.mp3"}
     )
@@ -862,17 +847,12 @@ async def get_song_audio(song_id: int, db: Session = Depends(get_db)):
 @router.get("/{song_id}/stream")
 async def stream_song(song_id: int, db: Session = Depends(get_db)):
     """Stream a song for media player playback."""
-    song = db.query(Song).filter(Song.id == song_id).first()
-    if not song:
-        raise HTTPException(status_code=404, detail="Song not found")
-    
-    file_path = song.file_path
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Song file not found")
+    song = _get_song_by_id(db, song_id)
+    _validate_file_exists(song.file_path)
     
     # Return the audio file for streaming
     return FileResponse(
-        file_path,
+        song.file_path,
         media_type="audio/mpeg",
         headers={
             "Accept-Ranges": "bytes",
@@ -895,53 +875,3 @@ async def _delete_song(song_id: int, db: Session = Depends(get_db)):
     db.delete(song)
     db.commit()
     return {"message": "Song removed from system"}
-
-@router.post("/batch-tag")
-async def batch_tag_songs(
-    request: BatchTagRequest,
-    db: Session = Depends(get_db)
-):
-    """Apply tags to multiple songs in batch."""
-    
-    if request.operation not in ["add", "replace", "remove"]:
-        raise HTTPException(status_code=400, detail="Invalid operation. Must be 'add', 'replace', or 'remove'")
-    
-    # Get the songs
-    songs = db.query(Song).filter(Song.id.in_(request.song_ids)).all()
-    if not songs:
-        raise HTTPException(status_code=404, detail="No songs found")
-    
-    # Get the tags
-    tags = db.query(Tag).filter(Tag.id.in_(request.tag_ids)).all()
-    if not tags:
-        raise HTTPException(status_code=404, detail="No tags found")
-    
-    updated_count = 0
-    
-    for song in songs:
-        if request.operation == "add":
-            # Add tags (keep existing)
-            for tag in tags:
-                if tag not in song.tags:
-                    song.tags.append(tag)
-            updated_count += 1
-            
-        elif request.operation == "replace":
-            # Replace all tags with selected ones
-            song.tags = tags
-            updated_count += 1
-            
-        elif request.operation == "remove":
-            # Remove specified tags
-            for tag in tags:
-                if tag in song.tags:
-                    song.tags.remove(tag)
-            updated_count += 1
-    
-    db.commit()
-    
-    return {
-        "message": f"Successfully {request.operation}ed tags for {updated_count} songs",
-        "updated_count": updated_count,
-        "operation": request.operation
-    }
