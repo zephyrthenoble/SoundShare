@@ -5,7 +5,7 @@ from fastapi.responses import HTMLResponse
 import uvicorn
 
 from database.database import engine, Base
-from routes import songs, tags, groups, library, unified_playlists
+from routes import songs, tags, groups, library, unified_playlists, criteria
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -24,6 +24,7 @@ app.include_router(unified_playlists.router, prefix="/api/unified-playlists", ta
 app.include_router(tags.router, prefix="/api/tags", tags=["tags"])
 app.include_router(groups.router, prefix="/api/groups", tags=["groups"])
 app.include_router(library.router, prefix="/api/library", tags=["library"])
+app.include_router(criteria.router, prefix="/criteria", tags=["criteria"])
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):

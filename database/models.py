@@ -93,6 +93,14 @@ unified_playlist_manual_songs = Table(
     Column('order_index', Integer, default=0)
 )
 
+unified_playlist_criteria = Table(
+    'unified_playlist_criteria',
+    Base.metadata,
+    Column('unified_playlist_id', Integer, ForeignKey('unified_playlists.id'), primary_key=True),
+    Column('criteria_id', Integer, ForeignKey('dynamic_criteria.id'), primary_key=True),
+    Column('order_index', Integer, default=0)
+)
+
 class UnifiedPlaylist(Base):
     __tablename__ = "unified_playlists"
     
@@ -109,14 +117,13 @@ class UnifiedPlaylist(Base):
     
     # Relationships
     manual_songs = relationship("Song", secondary=unified_playlist_manual_songs)
-    dynamic_criteria = relationship("DynamicCriteria", back_populates="playlist", cascade="all, delete-orphan")
+    dynamic_criteria = relationship("DynamicCriteria", secondary=unified_playlist_criteria)
 
 class DynamicCriteria(Base):
     __tablename__ = "dynamic_criteria"
     
     id = Column(Integer, primary_key=True, index=True)
-    playlist_id = Column(Integer, ForeignKey('unified_playlists.id'), nullable=False)
-    name = Column(String, nullable=False)  # User-friendly name for this criteria
+    name = Column(String, nullable=False, unique=True)  # Unique user-friendly name for this criteria
     
     # Flexible inclusion/exclusion criteria stored as JSON
     # Structure: {
@@ -142,11 +149,5 @@ class DynamicCriteria(Base):
     include_criteria = Column(JSON, default=dict)
     exclude_criteria = Column(JSON, default=dict)
     
-    # Order within the playlist (multiple criteria can be ordered)
-    order_index = Column(Integer, default=0)
-    
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    
-    # Relationship back to playlist
-    playlist = relationship("UnifiedPlaylist", back_populates="dynamic_criteria")

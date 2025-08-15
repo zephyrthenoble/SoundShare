@@ -977,6 +977,302 @@ class SongSearchComponent {
             this.applyFilters();
         }
     }
+
+    /**
+     * Extract current filter values as criteria objects
+     * Returns object with includeCriteria and excludeCriteria
+     */
+    getCriteria() {
+        const includeCriteria = {};
+        const excludeCriteria = {};
+
+        // Get include tag values
+        const includeTags = Array.from(document.querySelectorAll(`#${this.componentId}IncludeTags .tag-item`))
+            .map(tag => parseInt(tag.dataset.tagId))
+            .filter(id => !isNaN(id));
+        if (includeTags.length > 0) {
+            includeCriteria.tags = includeTags;
+        }
+
+        // Get exclude tag values
+        const excludeTags = Array.from(document.querySelectorAll(`#${this.componentId}ExcludeTags .tag-item`))
+            .map(tag => parseInt(tag.dataset.tagId))
+            .filter(id => !isNaN(id));
+        if (excludeTags.length > 0) {
+            excludeCriteria.tags = excludeTags;
+        }
+
+        // Get include tag group values
+        const includeGroups = Array.from(document.querySelectorAll(`#${this.componentId}IncludeTagGroups .tag-group-item`))
+            .map(group => parseInt(group.dataset.groupId))
+            .filter(id => !isNaN(id));
+        if (includeGroups.length > 0) {
+            includeCriteria.tag_groups = includeGroups;
+        }
+
+        // Get exclude tag group values
+        const excludeGroups = Array.from(document.querySelectorAll(`#${this.componentId}ExcludeTagGroups .tag-group-item`))
+            .map(group => parseInt(group.dataset.groupId))
+            .filter(id => !isNaN(id));
+        if (excludeGroups.length > 0) {
+            excludeCriteria.tag_groups = excludeGroups;
+        }
+
+        // Get artist filter
+        const artistFilter = document.getElementById(`${this.componentId}ArtistFilter`)?.value;
+        if (artistFilter && artistFilter !== 'all') {
+            includeCriteria.artists = [artistFilter];
+        }
+
+        // Get album filter
+        const albumFilter = document.getElementById(`${this.componentId}AlbumFilter`)?.value;
+        if (albumFilter && albumFilter !== 'all') {
+            includeCriteria.albums = [albumFilter];
+        }
+
+        // Get genre filter
+        const genreFilter = document.getElementById(`${this.componentId}GenreFilter`)?.value;
+        if (genreFilter && genreFilter !== 'all') {
+            includeCriteria.genres = [genreFilter];
+        }
+
+        // Get folder filter
+        const folderFilter = document.getElementById(`${this.componentId}FolderFilter`)?.value;
+        if (folderFilter && folderFilter !== 'all') {
+            includeCriteria.folders = [folderFilter];
+        }
+
+        // Get audio feature filters
+        const energyMin = parseFloat(document.getElementById(`${this.componentId}EnergyMin`)?.value);
+        const energyMax = parseFloat(document.getElementById(`${this.componentId}EnergyMax`)?.value);
+        if (!isNaN(energyMin) || !isNaN(energyMax)) {
+            includeCriteria.energy = {
+                min: isNaN(energyMin) ? 0 : energyMin,
+                max: isNaN(energyMax) ? 1 : energyMax
+            };
+        }
+
+        const valenceMin = parseFloat(document.getElementById(`${this.componentId}ValenceMin`)?.value);
+        const valenceMax = parseFloat(document.getElementById(`${this.componentId}ValenceMax`)?.value);
+        if (!isNaN(valenceMin) || !isNaN(valenceMax)) {
+            includeCriteria.valence = {
+                min: isNaN(valenceMin) ? 0 : valenceMin,
+                max: isNaN(valenceMax) ? 1 : valenceMax
+            };
+        }
+
+        const danceabilityMin = parseFloat(document.getElementById(`${this.componentId}DanceabilityMin`)?.value);
+        const danceabilityMax = parseFloat(document.getElementById(`${this.componentId}DanceabilityMax`)?.value);
+        if (!isNaN(danceabilityMin) || !isNaN(danceabilityMax)) {
+            includeCriteria.danceability = {
+                min: isNaN(danceabilityMin) ? 0 : danceabilityMin,
+                max: isNaN(danceabilityMax) ? 1 : danceabilityMax
+            };
+        }
+
+        const tempoMin = parseFloat(document.getElementById(`${this.componentId}TempoMin`)?.value);
+        const tempoMax = parseFloat(document.getElementById(`${this.componentId}TempoMax`)?.value);
+        if (!isNaN(tempoMin) || !isNaN(tempoMax)) {
+            includeCriteria.tempo = {
+                min: isNaN(tempoMin) ? 60 : tempoMin,
+                max: isNaN(tempoMax) ? 200 : tempoMax
+            };
+        }
+
+        const durationMin = parseFloat(document.getElementById(`${this.componentId}DurationMin`)?.value);
+        const durationMax = parseFloat(document.getElementById(`${this.componentId}DurationMax`)?.value);
+        if (!isNaN(durationMin) || !isNaN(durationMax)) {
+            includeCriteria.duration = {
+                min: isNaN(durationMin) ? 30 : durationMin,
+                max: isNaN(durationMax) ? 600 : durationMax
+            };
+        }
+
+        const yearMin = parseInt(document.getElementById(`${this.componentId}YearMin`)?.value);
+        const yearMax = parseInt(document.getElementById(`${this.componentId}YearMax`)?.value);
+        if (!isNaN(yearMin) || !isNaN(yearMax)) {
+            includeCriteria.year = {
+                min: isNaN(yearMin) ? 1990 : yearMin,
+                max: isNaN(yearMax) ? new Date().getFullYear() : yearMax
+            };
+        }
+
+        return { includeCriteria, excludeCriteria };
+    }
+
+    /**
+     * Load criteria into the search component
+     * @param {Object} includeCriteria - Include criteria object
+     * @param {Object} excludeCriteria - Exclude criteria object
+     */
+    async loadCriteria(includeCriteria = {}, excludeCriteria = {}) {
+        // Clear existing criteria
+        this.clearFilters();
+
+        // Load include tags
+        if (includeCriteria.tags && includeCriteria.tags.length > 0) {
+            for (const tagId of includeCriteria.tags) {
+                const tag = this.tags.find(t => t.id === tagId);
+                if (tag) {
+                    this.addIncludeTag(tag);
+                }
+            }
+        }
+
+        // Load exclude tags
+        if (excludeCriteria.tags && excludeCriteria.tags.length > 0) {
+            for (const tagId of excludeCriteria.tags) {
+                const tag = this.tags.find(t => t.id === tagId);
+                if (tag) {
+                    this.addExcludeTag(tag);
+                }
+            }
+        }
+
+        // Load include tag groups
+        if (includeCriteria.tag_groups && includeCriteria.tag_groups.length > 0) {
+            for (const groupId of includeCriteria.tag_groups) {
+                const group = this.tagGroups.find(g => g.id === groupId);
+                if (group) {
+                    this.addIncludeTagGroup(group);
+                }
+            }
+        }
+
+        // Load exclude tag groups
+        if (excludeCriteria.tag_groups && excludeCriteria.tag_groups.length > 0) {
+            for (const groupId of excludeCriteria.tag_groups) {
+                const group = this.tagGroups.find(g => g.id === groupId);
+                if (group) {
+                    this.addExcludeTagGroup(group);
+                }
+            }
+        }
+
+        // Set filter values
+        if (includeCriteria.artists && includeCriteria.artists.length > 0) {
+            const artistFilter = document.getElementById(`${this.componentId}ArtistFilter`);
+            if (artistFilter) artistFilter.value = includeCriteria.artists[0];
+        }
+
+        if (includeCriteria.albums && includeCriteria.albums.length > 0) {
+            const albumFilter = document.getElementById(`${this.componentId}AlbumFilter`);
+            if (albumFilter) albumFilter.value = includeCriteria.albums[0];
+        }
+
+        if (includeCriteria.genres && includeCriteria.genres.length > 0) {
+            const genreFilter = document.getElementById(`${this.componentId}GenreFilter`);
+            if (genreFilter) genreFilter.value = includeCriteria.genres[0];
+        }
+
+        if (includeCriteria.folders && includeCriteria.folders.length > 0) {
+            const folderFilter = document.getElementById(`${this.componentId}FolderFilter`);
+            if (folderFilter) folderFilter.value = includeCriteria.folders[0];
+        }
+
+        // Set audio feature ranges
+        if (includeCriteria.energy) {
+            const energyMin = document.getElementById(`${this.componentId}EnergyMin`);
+            const energyMax = document.getElementById(`${this.componentId}EnergyMax`);
+            if (energyMin) energyMin.value = includeCriteria.energy.min;
+            if (energyMax) energyMax.value = includeCriteria.energy.max;
+        }
+
+        if (includeCriteria.valence) {
+            const valenceMin = document.getElementById(`${this.componentId}ValenceMin`);
+            const valenceMax = document.getElementById(`${this.componentId}ValenceMax`);
+            if (valenceMin) valenceMin.value = includeCriteria.valence.min;
+            if (valenceMax) valenceMax.value = includeCriteria.valence.max;
+        }
+
+        if (includeCriteria.danceability) {
+            const danceabilityMin = document.getElementById(`${this.componentId}DanceabilityMin`);
+            const danceabilityMax = document.getElementById(`${this.componentId}DanceabilityMax`);
+            if (danceabilityMin) danceabilityMin.value = includeCriteria.danceability.min;
+            if (danceabilityMax) danceabilityMax.value = includeCriteria.danceability.max;
+        }
+
+        if (includeCriteria.tempo) {
+            const tempoMin = document.getElementById(`${this.componentId}TempoMin`);
+            const tempoMax = document.getElementById(`${this.componentId}TempoMax`);
+            if (tempoMin) tempoMin.value = includeCriteria.tempo.min;
+            if (tempoMax) tempoMax.value = includeCriteria.tempo.max;
+        }
+
+        if (includeCriteria.duration) {
+            const durationMin = document.getElementById(`${this.componentId}DurationMin`);
+            const durationMax = document.getElementById(`${this.componentId}DurationMax`);
+            if (durationMin) durationMin.value = includeCriteria.duration.min;
+            if (durationMax) durationMax.value = includeCriteria.duration.max;
+        }
+
+        if (includeCriteria.year) {
+            const yearMin = document.getElementById(`${this.componentId}YearMin`);
+            const yearMax = document.getElementById(`${this.componentId}YearMax`);
+            if (yearMin) yearMin.value = includeCriteria.year.min;
+            if (yearMax) yearMax.value = includeCriteria.year.max;
+        }
+
+        // Apply the loaded filters
+        this.applyFilters();
+    }
+
+    /**
+     * Clear all filters and criteria
+     */
+    clearFilters() {
+        // Clear tag selections
+        const includeTagsContainer = document.getElementById(`${this.componentId}IncludeTags`);
+        const excludeTagsContainer = document.getElementById(`${this.componentId}ExcludeTags`);
+        const includeGroupsContainer = document.getElementById(`${this.componentId}IncludeTagGroups`);
+        const excludeGroupsContainer = document.getElementById(`${this.componentId}ExcludeTagGroups`);
+
+        if (includeTagsContainer) includeTagsContainer.innerHTML = '';
+        if (excludeTagsContainer) excludeTagsContainer.innerHTML = '';
+        if (includeGroupsContainer) includeGroupsContainer.innerHTML = '';
+        if (excludeGroupsContainer) excludeGroupsContainer.innerHTML = '';
+
+        // Reset all select filters
+        const filters = [
+            `${this.componentId}ArtistFilter`,
+            `${this.componentId}AlbumFilter`,
+            `${this.componentId}GenreFilter`,
+            `${this.componentId}FolderFilter`
+        ];
+
+        filters.forEach(filterId => {
+            const element = document.getElementById(filterId);
+            if (element) element.value = 'all';
+        });
+
+        // Clear audio feature ranges
+        const rangeInputs = [
+            `${this.componentId}EnergyMin`,
+            `${this.componentId}EnergyMax`,
+            `${this.componentId}ValenceMin`,
+            `${this.componentId}ValenceMax`,
+            `${this.componentId}DanceabilityMin`,
+            `${this.componentId}DanceabilityMax`,
+            `${this.componentId}TempoMin`,
+            `${this.componentId}TempoMax`,
+            `${this.componentId}DurationMin`,
+            `${this.componentId}DurationMax`,
+            `${this.componentId}YearMin`,
+            `${this.componentId}YearMax`
+        ];
+
+        rangeInputs.forEach(inputId => {
+            const element = document.getElementById(inputId);
+            if (element) element.value = '';
+        });
+
+        // Clear text search
+        const searchInput = document.getElementById(`${this.componentId}Search`);
+        if (searchInput) searchInput.value = '';
+
+        // Apply filters to show all songs
+        this.applyFilters();
+    }
 }
 
 // Export for global use
