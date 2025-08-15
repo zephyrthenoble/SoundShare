@@ -54,6 +54,18 @@
     text-overflow: ellipsis;
 }
 
+/* Column minimum widths based on header text length */
+.song-table-component .col-checkbox { min-width: 50px; }
+.song-table-component .col-name { min-width: 60px; }
+.song-table-component .col-tags { min-width: 50px; }
+.song-table-component .col-artist { min-width: 60px; }
+.song-table-component .col-album { min-width: 60px; }
+.song-table-component .col-folder { min-width: 60px; }
+.song-table-component .col-duration { min-width: 70px; }
+.song-table-component .col-tempo { min-width: 65px; }
+.song-table-component .col-created-at { min-width: 85px; }
+.song-table-component .col-mood { min-width: 55px; }
+
 .song-table-component .table tbody tr {
     cursor: pointer;
     transition: background-color 0.15s ease;
@@ -231,7 +243,7 @@ window.songTable = (function() {
         // Checkbox column
         if (instance.config.showCheckboxes) {
             headersHTML += `
-                <th style="width: 3%;">
+                <th class="col-checkbox" style="width: 3%;">
                     <input type="checkbox" class="select-all-checkbox" onchange="songTable.toggleSelectAll('${tableId}')">
                 </th>
             `;
@@ -239,7 +251,7 @@ window.songTable = (function() {
         
         // Name column (always shown) - Large share
         headersHTML += `
-            <th style="width: 25%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'display_name')">
+            <th class="col-name" style="width: 25%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'display_name')">
                 Name <i class="fas fa-sort" id="sort-display_name-${tableId}"></i>
             </th>
         `;
@@ -247,20 +259,20 @@ window.songTable = (function() {
         // Tags column (moved to be between Name and Artist) - Large share
         if (instance.config.showTags) {
             headersHTML += `
-                <th style="width: 20%;">Tags</th>
+                <th class="col-tags" style="width: 20%;">Tags</th>
             `;
         }
         
         // Artist column (always shown) - Medium share
         headersHTML += `
-            <th style="width: 15%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'artist')">
+            <th class="col-artist" style="width: 15%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'artist')">
                 Artist <i class="fas fa-sort" id="sort-artist-${tableId}"></i>
             </th>
         `;
         
         // Album column (always shown) - Large share
         headersHTML += `
-            <th style="width: 20%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'album')">
+            <th class="col-album" style="width: 20%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'album')">
                 Album <i class="fas fa-sort" id="sort-album-${tableId}"></i>
             </th>
         `;
@@ -268,7 +280,7 @@ window.songTable = (function() {
         // Folder column - Large share
         if (instance.config.showFolder) {
             headersHTML += `
-                <th style="width: 15%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'folder')">
+                <th class="col-folder" style="width: 15%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'folder')">
                     Folder <i class="fas fa-sort" id="sort-folder-${tableId}"></i>
                 </th>
             `;
@@ -276,7 +288,7 @@ window.songTable = (function() {
         
         // Duration column (always shown) - Small share
         headersHTML += `
-            <th style="width: 6%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'duration')">
+            <th class="col-duration" style="width: 6%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'duration')">
                 Duration <i class="fas fa-sort" id="sort-duration-${tableId}"></i>
             </th>
         `;
@@ -284,7 +296,7 @@ window.songTable = (function() {
         // Tempo column - Small share
         if (instance.config.showAudioFeatures) {
             headersHTML += `
-                <th style="width: 6%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'tempo')">
+                <th class="col-tempo" style="width: 6%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'tempo')">
                     Tempo <i class="fas fa-sort" id="sort-tempo-${tableId}"></i>
                 </th>
             `;
@@ -293,7 +305,7 @@ window.songTable = (function() {
         // Created At column - Small share
         if (instance.config.showCreatedAt) {
             headersHTML += `
-                <th style="width: 8%; cursor: pointer; font-size: 0.875rem;" onclick="songTable.sortTable('${tableId}', 'created_at')">
+                <th class="col-created-at" style="width: 8%; cursor: pointer; font-size: 0.875rem;" onclick="songTable.sortTable('${tableId}', 'created_at')">
                     Created At <i class="fas fa-sort" id="sort-created_at-${tableId}"></i>
                 </th>
             `;
@@ -302,7 +314,7 @@ window.songTable = (function() {
         // Audio Features column (Mood bars) - Small share
         if (instance.config.showAudioFeatures) {
             headersHTML += `
-                <th style="width: 6%;">Mood</th>
+                <th class="col-mood" style="width: 6%;">Mood</th>
             `;
         }
         
@@ -363,7 +375,7 @@ window.songTable = (function() {
             // Checkbox column
             if (instance.config.showCheckboxes) {
                 rowHTML += `
-                    <td onclick="event.stopPropagation()">
+                    <td class="col-checkbox" onclick="event.stopPropagation()">
                         <input type="checkbox" class="song-checkbox" data-song-id="${song.id}" 
                                ${isSelected ? 'checked' : ''} 
                                onchange="songTable.toggleSongSelection('${tableId}', ${song.id}, event)"
@@ -374,7 +386,7 @@ window.songTable = (function() {
             
             // Name column
             rowHTML += `
-                <td class="text-ellipsis" title="${song.display_name}">
+                <td class="col-name text-ellipsis" title="${song.display_name}">
                     ${song.display_name}
                 </td>
             `;
@@ -386,7 +398,7 @@ window.songTable = (function() {
                     '<span class="text-muted small">No tags</span>';
                 
                 rowHTML += `
-                    <td>
+                    <td class="col-tags">
                         <div class="d-flex flex-wrap">
                             ${tagsHTML}
                         </div>
@@ -396,14 +408,14 @@ window.songTable = (function() {
             
             // Artist column
             rowHTML += `
-                <td class="text-ellipsis" title="${song.artist || ''}">
+                <td class="col-artist text-ellipsis" title="${song.artist || ''}">
                     ${song.artist || ''}
                 </td>
             `;
             
             // Album column
             rowHTML += `
-                <td class="text-ellipsis" title="${song.album || ''}">
+                <td class="col-album text-ellipsis" title="${song.album || ''}">
                     ${song.album || ''}
                 </td>
             `;
@@ -412,7 +424,7 @@ window.songTable = (function() {
             if (instance.config.showFolder) {
                 const folder = song.folder;
                 rowHTML += `
-                    <td class="text-ellipsis" title="${folder}">
+                    <td class="col-folder text-ellipsis" title="${folder}">
                         <small class="text-muted">${folder}</small>
                     </td>
                 `;
@@ -420,20 +432,20 @@ window.songTable = (function() {
             
             // Duration column
             rowHTML += `
-                <td><small>${formatDuration(song.duration)}</small></td>
+                <td class="col-duration"><small>${formatDuration(song.duration)}</small></td>
             `;
             
             // Tempo column
             if (instance.config.showAudioFeatures) {
                 rowHTML += `
-                    <td><small>${song.tempo ? Math.round(song.tempo) + ' BPM' : ''}</small></td>
+                    <td class="col-tempo"><small>${song.tempo ? Math.round(song.tempo) + ' BPM' : ''}</small></td>
                 `;
             }
             
             // Created At column
             if (instance.config.showCreatedAt) {
                 rowHTML += `
-                    <td style="font-size: 0.75rem;"><small>${formatDateTime(song.created_at)}</small></td>
+                    <td class="col-created-at" style="font-size: 0.75rem;"><small>${formatDateTime(song.created_at)}</small></td>
                 `;
             }
             
@@ -444,7 +456,7 @@ window.songTable = (function() {
                 const danceability = song.danceability !== null && song.danceability !== undefined ? Math.max((song.danceability * 100).toFixed(0), 2) : '0';
                 
                 rowHTML += `
-                    <td style="padding: 4px; height: 40px; vertical-align: middle;">
+                    <td class="col-mood" style="padding: 4px; height: 40px; vertical-align: middle;">
                         <div class="mood-bars" style="width: 100%;" title="Energy: ${energy}% | Valence: ${valence}% | Danceability: ${danceability}%">
                             <div class="mood-bar-container">
                                 <div class="energy-bar" style="width: ${energy}%;" title="Energy: ${energy}%"></div>
