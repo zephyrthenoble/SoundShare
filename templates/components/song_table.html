@@ -3,28 +3,55 @@
 
 <div class="song-table-component" id="songTableComponent">
     <!-- Song Table -->
-    <div class="card">
-        <div class="card-body">
-            <table class="table table-striped song-table" id="songsTable">
-                <thead>
-                    <tr class="table-header-row">
-                        <!-- Headers will be dynamically generated -->
-                    </tr>
-                </thead>
-                <tbody>
-                    <!-- Songs will be loaded here via JavaScript -->
-                </tbody>
-            </table>
+    <div class="card w-100">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-striped song-table mb-0" id="songsTable">
+                    <thead>
+                        <tr class="table-header-row">
+                            <!-- Headers will be dynamically generated -->
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Songs will be loaded here via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+            <!-- Pagination Controls -->
+            <div class="d-flex justify-content-between align-items-center p-3 border-top bg-light">
+                <div class="pagination-info">
+                    <small class="text-muted">
+                        Showing <span id="paginationStart-songsTable">1</span>-<span id="paginationEnd-songsTable">25</span> of <span id="paginationTotal-songsTable">0</span> songs
+                    </small>
+                </div>
+                <nav aria-label="Table pagination">
+                    <ul class="pagination pagination-sm mb-0" id="paginationControls-songsTable">
+                        <!-- Pagination buttons will be generated here -->
+                    </ul>
+                </nav>
+            </div>
         </div>
     </div>
 </div>
 
 <style>
 /* Song Table Component Styles */
+.song-table-component .table {
+    table-layout: fixed;
+    width: 100%;
+}
+
 .song-table-component .table th {
     background-color: #f8f9fa;
     border-bottom: 2px solid #dee2e6;
     font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.song-table-component .table td {
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .song-table-component .table tbody tr {
@@ -120,6 +147,33 @@
     margin-right: 0.25rem;
     margin-bottom: 0.25rem;
 }
+
+/* Pagination styles */
+.song-table-component .pagination-info {
+    color: #6c757d;
+}
+
+.song-table-component .pagination .page-link {
+    color: #495057;
+    border-color: #dee2e6;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+.song-table-component .pagination .page-item.active .page-link {
+    background-color: #0d6efd;
+    border-color: #0d6efd;
+}
+
+.song-table-component .pagination .page-link:hover {
+    color: #0d6efd;
+    background-color: #e9ecef;
+    border-color: #dee2e6;
+}
+
+.song-table-component .table-responsive {
+    border-radius: 0.375rem 0.375rem 0 0;
+}
 </style>
 
 <script>
@@ -141,6 +195,8 @@ window.songTable = (function() {
             expandedSongRow: null,
             currentSortField: config.defaultSort || 'display_name',
             currentSortDirection: 'asc',
+            currentPage: 1,
+            itemsPerPage: 25,
             config: config,
             onSelectionChange: config.onSelectionChange || function() {},
             onSongClick: config.onSongClick || function() {},
@@ -175,80 +231,82 @@ window.songTable = (function() {
         // Checkbox column
         if (instance.config.showCheckboxes) {
             headersHTML += `
-                <th width="50">
+                <th style="width: 3%;">
                     <input type="checkbox" class="select-all-checkbox" onchange="songTable.toggleSelectAll('${tableId}')">
                 </th>
             `;
         }
         
-        // Name column (always shown)
+        // Name column (always shown) - Large share
         headersHTML += `
-            <th width="250" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'display_name')">
+            <th style="width: 25%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'display_name')">
                 Name <i class="fas fa-sort" id="sort-display_name-${tableId}"></i>
             </th>
         `;
         
-        // Artist column (always shown)
+        // Tags column (moved to be between Name and Artist) - Large share
+        if (instance.config.showTags) {
+            headersHTML += `
+                <th style="width: 20%;">Tags</th>
+            `;
+        }
+        
+        // Artist column (always shown) - Medium share
         headersHTML += `
-            <th width="160" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'artist')">
+            <th style="width: 15%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'artist')">
                 Artist <i class="fas fa-sort" id="sort-artist-${tableId}"></i>
             </th>
         `;
         
-        // Album column (always shown)
+        // Album column (always shown) - Large share
         headersHTML += `
-            <th width="160" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'album')">
+            <th style="width: 20%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'album')">
                 Album <i class="fas fa-sort" id="sort-album-${tableId}"></i>
             </th>
         `;
         
-        // Folder column
+        // Folder column - Large share
         if (instance.config.showFolder) {
             headersHTML += `
-                <th width="140" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'folder')">
+                <th style="width: 15%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'folder')">
                     Folder <i class="fas fa-sort" id="sort-folder-${tableId}"></i>
                 </th>
             `;
         }
         
-        // Duration column (always shown)
+        // Duration column (always shown) - Small share
         headersHTML += `
-            <th width="80" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'duration')">
+            <th style="width: 6%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'duration')">
                 Duration <i class="fas fa-sort" id="sort-duration-${tableId}"></i>
             </th>
         `;
         
-        // Tempo column
+        // Tempo column - Small share
         if (instance.config.showAudioFeatures) {
             headersHTML += `
-                <th width="100" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'tempo')">
+                <th style="width: 6%; cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'tempo')">
                     Tempo <i class="fas fa-sort" id="sort-tempo-${tableId}"></i>
                 </th>
             `;
         }
         
-        // Created At column
+        // Created At column - Small share
         if (instance.config.showCreatedAt) {
             headersHTML += `
-                <th width="140" style="cursor: pointer;" onclick="songTable.sortTable('${tableId}', 'created_at')">
+                <th style="width: 8%; cursor: pointer; font-size: 0.875rem;" onclick="songTable.sortTable('${tableId}', 'created_at')">
                     Created At <i class="fas fa-sort" id="sort-created_at-${tableId}"></i>
                 </th>
             `;
         }
         
-        // Audio Features column (Mood bars)
+        // Audio Features column (Mood bars) - Small share
         if (instance.config.showAudioFeatures) {
             headersHTML += `
-                <th width="180">Mood</th>
+                <th style="width: 6%;">Mood</th>
             `;
         }
         
-        // Tags column
-        if (instance.config.showTags) {
-            headersHTML += `
-                <th width="150">Tags</th>
-            `;
-        }
+        // Tags column (removed from here since it was moved up)
         
         headerRow.innerHTML = headersHTML;
     }
@@ -268,6 +326,7 @@ window.songTable = (function() {
         const instance = instances.get(tableId);
         if (instance) {
             instance.filteredSongs = instance.songs.filter(filterFn);
+            instance.currentPage = 1; // Reset to first page when filtering
             renderTable(tableId);
         }
     }
@@ -282,7 +341,16 @@ window.songTable = (function() {
         
         tbody.innerHTML = '';
         
-        instance.filteredSongs.forEach(song => {
+        // Calculate pagination
+        const totalSongs = instance.filteredSongs.length;
+        const totalPages = Math.ceil(totalSongs / instance.itemsPerPage);
+        const startIndex = (instance.currentPage - 1) * instance.itemsPerPage;
+        const endIndex = Math.min(startIndex + instance.itemsPerPage, totalSongs);
+        
+        // Get songs for current page
+        const pageSongs = instance.filteredSongs.slice(startIndex, endIndex);
+        
+        pageSongs.forEach((song, index) => {
             const row = document.createElement('tr');
             row.dataset.songId = song.id;
             row.style.cursor = 'pointer';
@@ -306,21 +374,36 @@ window.songTable = (function() {
             
             // Name column
             rowHTML += `
-                <td class="text-ellipsis" title="${song.display_name}" style="max-width: 250px;">
+                <td class="text-ellipsis" title="${song.display_name}">
                     ${song.display_name}
                 </td>
             `;
             
+            // Tags column (moved to be between Name and Artist)
+            if (instance.config.showTags) {
+                const tagsHTML = song.tags && song.tags.length > 0 ? 
+                    song.tags.map(tag => `<span class="badge bg-secondary tag-badge">${tag.name}</span>`).join('') : 
+                    '<span class="text-muted small">No tags</span>';
+                
+                rowHTML += `
+                    <td>
+                        <div class="d-flex flex-wrap">
+                            ${tagsHTML}
+                        </div>
+                    </td>
+                `;
+            }
+            
             // Artist column
             rowHTML += `
-                <td class="text-ellipsis" title="${song.artist || ''}" style="max-width: 160px;">
+                <td class="text-ellipsis" title="${song.artist || ''}">
                     ${song.artist || ''}
                 </td>
             `;
             
             // Album column
             rowHTML += `
-                <td class="text-ellipsis" title="${song.album || ''}" style="max-width: 160px;">
+                <td class="text-ellipsis" title="${song.album || ''}">
                     ${song.album || ''}
                 </td>
             `;
@@ -329,7 +412,7 @@ window.songTable = (function() {
             if (instance.config.showFolder) {
                 const folder = song.folder;
                 rowHTML += `
-                    <td class="text-ellipsis" title="${folder}" style="max-width: 140px;">
+                    <td class="text-ellipsis" title="${folder}">
                         <small class="text-muted">${folder}</small>
                     </td>
                 `;
@@ -350,11 +433,11 @@ window.songTable = (function() {
             // Created At column
             if (instance.config.showCreatedAt) {
                 rowHTML += `
-                    <td><small>${formatDateTime(song.created_at)}</small></td>
+                    <td style="font-size: 0.75rem;"><small>${formatDateTime(song.created_at)}</small></td>
                 `;
             }
             
-            // Audio Features column
+            // Audio Features column (Mood bars)
             if (instance.config.showAudioFeatures) {
                 const energy = song.energy !== null && song.energy !== undefined ? Math.max((song.energy * 100).toFixed(0), 2) : '0';
                 const valence = song.valence !== null && song.valence !== undefined ? Math.max((song.valence * 100).toFixed(0), 2) : '0';
@@ -362,7 +445,7 @@ window.songTable = (function() {
                 
                 rowHTML += `
                     <td style="padding: 4px; height: 40px; vertical-align: middle;">
-                        <div class="mood-bars" title="Energy: ${energy}% | Valence: ${valence}% | Danceability: ${danceability}%">
+                        <div class="mood-bars" style="width: 100%;" title="Energy: ${energy}% | Valence: ${valence}% | Danceability: ${danceability}%">
                             <div class="mood-bar-container">
                                 <div class="energy-bar" style="width: ${energy}%;" title="Energy: ${energy}%"></div>
                             </div>
@@ -372,21 +455,6 @@ window.songTable = (function() {
                             <div class="mood-bar-container">
                                 <div class="danceability-bar" style="width: ${danceability}%;" title="Danceability: ${danceability}%"></div>
                             </div>
-                        </div>
-                    </td>
-                `;
-            }
-            
-            // Tags column
-            if (instance.config.showTags) {
-                const tagsHTML = song.tags && song.tags.length > 0 ? 
-                    song.tags.map(tag => `<span class="badge bg-secondary tag-badge">${tag.name}</span>`).join('') : 
-                    '<span class="text-muted small">No tags</span>';
-                
-                rowHTML += `
-                    <td>
-                        <div class="d-flex flex-wrap">
-                            ${tagsHTML}
                         </div>
                     </td>
                 `;
@@ -406,6 +474,130 @@ window.songTable = (function() {
         });
         
         updateSortIndicators(tableId);
+        updatePaginationInfo(tableId);
+        renderPaginationControls(tableId);
+    }
+    
+    // Update pagination info display
+    function updatePaginationInfo(tableId) {
+        const instance = instances.get(tableId);
+        if (!instance) return;
+        
+        const totalSongs = instance.filteredSongs.length;
+        const startIndex = (instance.currentPage - 1) * instance.itemsPerPage;
+        const endIndex = Math.min(startIndex + instance.itemsPerPage, totalSongs);
+        
+        const startSpan = document.getElementById(`paginationStart-${tableId}`);
+        const endSpan = document.getElementById(`paginationEnd-${tableId}`);
+        const totalSpan = document.getElementById(`paginationTotal-${tableId}`);
+        
+        if (startSpan) startSpan.textContent = totalSongs > 0 ? startIndex + 1 : 0;
+        if (endSpan) endSpan.textContent = endIndex;
+        if (totalSpan) totalSpan.textContent = totalSongs;
+    }
+    
+    // Render pagination controls
+    function renderPaginationControls(tableId) {
+        const instance = instances.get(tableId);
+        if (!instance) return;
+        
+        const totalSongs = instance.filteredSongs.length;
+        const totalPages = Math.ceil(totalSongs / instance.itemsPerPage);
+        const currentPage = instance.currentPage;
+        
+        const paginationControls = document.getElementById(`paginationControls-${tableId}`);
+        if (!paginationControls) return;
+        
+        paginationControls.innerHTML = '';
+        
+        if (totalPages <= 1) return;
+        
+        // Previous button
+        const prevLi = document.createElement('li');
+        prevLi.className = `page-item ${currentPage === 1 ? 'disabled' : ''}`;
+        prevLi.innerHTML = `
+            <a class="page-link" href="#" onclick="songTable.goToPage('${tableId}', ${currentPage - 1}); return false;">
+                <i class="fas fa-chevron-left"></i>
+            </a>
+        `;
+        paginationControls.appendChild(prevLi);
+        
+        // Page numbers
+        const maxVisiblePages = 5;
+        let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+        let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+        
+        // Adjust start page if we're near the end
+        if (endPage - startPage + 1 < maxVisiblePages) {
+            startPage = Math.max(1, endPage - maxVisiblePages + 1);
+        }
+        
+        // First page link if needed
+        if (startPage > 1) {
+            const firstLi = document.createElement('li');
+            firstLi.className = 'page-item';
+            firstLi.innerHTML = `
+                <a class="page-link" href="#" onclick="songTable.goToPage('${tableId}', 1); return false;">1</a>
+            `;
+            paginationControls.appendChild(firstLi);
+            
+            if (startPage > 2) {
+                const dotsLi = document.createElement('li');
+                dotsLi.className = 'page-item disabled';
+                dotsLi.innerHTML = '<span class="page-link">...</span>';
+                paginationControls.appendChild(dotsLi);
+            }
+        }
+        
+        // Page number links
+        for (let i = startPage; i <= endPage; i++) {
+            const pageLi = document.createElement('li');
+            pageLi.className = `page-item ${i === currentPage ? 'active' : ''}`;
+            pageLi.innerHTML = `
+                <a class="page-link" href="#" onclick="songTable.goToPage('${tableId}', ${i}); return false;">${i}</a>
+            `;
+            paginationControls.appendChild(pageLi);
+        }
+        
+        // Last page link if needed
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                const dotsLi = document.createElement('li');
+                dotsLi.className = 'page-item disabled';
+                dotsLi.innerHTML = '<span class="page-link">...</span>';
+                paginationControls.appendChild(dotsLi);
+            }
+            
+            const lastLi = document.createElement('li');
+            lastLi.className = 'page-item';
+            lastLi.innerHTML = `
+                <a class="page-link" href="#" onclick="songTable.goToPage('${tableId}', ${totalPages}); return false;">${totalPages}</a>
+            `;
+            paginationControls.appendChild(lastLi);
+        }
+        
+        // Next button
+        const nextLi = document.createElement('li');
+        nextLi.className = `page-item ${currentPage === totalPages ? 'disabled' : ''}`;
+        nextLi.innerHTML = `
+            <a class="page-link" href="#" onclick="songTable.goToPage('${tableId}', ${currentPage + 1}); return false;">
+                <i class="fas fa-chevron-right"></i>
+            </a>
+        `;
+        paginationControls.appendChild(nextLi);
+    }
+    
+    // Go to specific page
+    function goToPage(tableId, page) {
+        const instance = instances.get(tableId);
+        if (!instance) return;
+        
+        const totalPages = Math.ceil(instance.filteredSongs.length / instance.itemsPerPage);
+        
+        if (page < 1 || page > totalPages) return;
+        
+        instance.currentPage = page;
+        renderTable(tableId);
     }
     
     // Toggle song selection with shift-click support
@@ -955,6 +1147,7 @@ window.songTable = (function() {
         manageTags: manageTags,
         getSelectedSongs: getSelectedSongs,
         clearSelection: clearSelection,
+        goToPage: goToPage,
         getInstance: (tableId) => instances.get(tableId)
     };
 })();
